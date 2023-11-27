@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -44,21 +43,6 @@ func (e *Echo) URL() string {
 	}
 
 	return fmt.Sprintf("%s%s.%s", config.BaseURL, e.Hash, e.Extension)
-}
-
-func (e *Echo) Compress() {
-	if e.Extension != "png" {
-		return
-	}
-
-	_, err := exec.LookPath("pngquant")
-	if err != nil {
-		return
-	}
-
-	cmd := exec.Command("pngquant", "--force", "--ext", ".png", "256", e.Storage())
-
-	_ = cmd.Start()
 }
 
 func (e *Echo) Exists() bool {

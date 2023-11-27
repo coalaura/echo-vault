@@ -24,6 +24,8 @@ A minimal golang ShareX backend.
 
 ![sharex](.github/sharex.png)
 
+1.  If you want your screenshots to be automatically compressed you will have to install `pngquant` on your server. On ubuntu you can do this using `apt install pngquant`.
+
 ## Configuration
 
 When you run the program for the first time, it will generate a `config.json` file in the same directory as the executable. You can edit this file to change the configuration.
