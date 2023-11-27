@@ -28,7 +28,12 @@ func scanStorage() error {
 
 	var echos []Echo
 
-	err := filepath.Walk("./storage", func(path string, info os.FileInfo, err error) error {
+	path, err := storageAbs()
+	if err != nil {
+		return err
+	}
+
+	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
