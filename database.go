@@ -16,14 +16,20 @@ func connectToDatabase() error {
 		return err
 	}
 
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS echos (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		hash TEXT NOT NULL,
-		name TEXT NOT NULL,
-		extension TEXT NOT NULL,
-		upload_size INTEGER NOT NULL,
-		timestamp INTEGER NOT NULL
-	)`)
+	b := NewTableBuilder(db, "echos")
+
+	err = b.Create()
+	if err != nil {
+		return err
+	}
+
+	err = b.AddColumns([]SQLiteColumn{
+		{"hash", "TEXT NOT NULL"},
+		{"name", "TEXT NOT NULL"},
+		{"extension", "TEXT NOT NULL"},
+		{"upload_size", "INTEGER NOT NULL"},
+		{"timestamp", "INTEGER NOT NULL"},
+	})
 	if err != nil {
 		return err
 	}
