@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 
 	"github.com/coalaura/logger"
@@ -10,7 +9,7 @@ import (
 
 var (
 	config   EchoConfig
-	database *sql.DB
+	database *EchoDatabase
 
 	log = logger.New()
 )
@@ -34,10 +33,12 @@ func main() {
 
 	r.Use(gin.Recovery())
 	r.Use(log.Middleware())
-
-	r.Static("/", "./storage")
+	r.Use(authenticate)
 
 	r.POST("/upload", uploadHandler)
+
+	r.GET("/echos", listEchosHandler)
+	r.DELETE("/echos/:hash", deleteEchoHandler)
 
 	log.InfoF("Starting server at %s...\n", config.Addr())
 	log.MustPanic(r.Run(config.Addr()))

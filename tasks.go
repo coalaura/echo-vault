@@ -62,7 +62,12 @@ func scanStorage() error {
 	var newEchos []Echo
 
 	for _, echo := range echos {
-		if !echo.Exists() {
+		exists, err := database.Exists(echo.Hash)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
 			newEchos = append(newEchos, echo)
 		}
 	}
@@ -78,7 +83,7 @@ func scanStorage() error {
 	for i, echo := range newEchos {
 		log.NoteF("[%d/%d] Creating echo %s...\n", i+1, len(newEchos), echo.Hash)
 
-		err = echo.Create()
+		err = database.Create(&echo)
 		if err != nil {
 			return err
 		}
