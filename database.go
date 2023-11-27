@@ -2,13 +2,16 @@ package main
 
 import (
 	"database/sql"
-	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
+type EchoDatabase struct {
+	*sql.DB
+}
+
 func connectToDatabase() error {
-	db, err := sql.Open("sqlite3", "./echo.db")
+	db, err := sql.Open("sqlite", "./echo.db")
 	if err != nil {
 		return err
 	}
@@ -25,26 +28,66 @@ func connectToDatabase() error {
 		return err
 	}
 
-	database = db
+	database = &EchoDatabase{db}
 
 	return nil
 }
 
-func (e *Echo) Create() error {
-	if e.Hash == "" {
-		hash, err := findFreeHash()
-		if err != nil {
-			return nil
+func (d *EchoDatabase) Exists(hash string) (bool, error) {
+	var count int
+
+	err := d.QueryRow("SELECT COUNT(id) FROM echos WHERE hash = ?", hash).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func (d *EchoDatabase) Find(hash string) (*Echo, error) {
+	var e Echo
+
+	err := d.QueryRow("SELECT id, hash, name, extension, upload_size, timestamp FROM echos WHERE hash = ?", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
 		}
 
-		e.Hash = hash
+		return nil, err
 	}
 
-	if e.Timestamp == 0 {
-		e.Timestamp = time.Now().Unix()
+	return &e, nil
+}
+
+func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
+	rows, err := database.Query("SELECT id, hash, name, extension, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	if err != nil {
+		return nil, err
 	}
 
-	_, err := database.Exec("INSERT INTO echos (hash, name, extension, upload_size, timestamp) VALUES (?, ?, ?, ?, ?)", e.Hash, e.Name, e.Extension, e.UploadSize, e.Timestamp)
+	var echos []Echo
+
+	for rows.Next() {
+		var e Echo
+
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+
+		echos = append(echos, e)
+	}
+
+	return echos, nil
+}
+
+func (d *EchoDatabase) Create(echo *Echo) error {
+	err := echo.Fill()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec("INSERT INTO echos (hash, name, extension, upload_size, timestamp) VALUES (?, ?, ?, ?, ?)", echo.Hash, echo.Name, echo.Extension, echo.UploadSize, echo.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -52,19 +95,8 @@ func (e *Echo) Create() error {
 	return nil
 }
 
-func (e *Echo) Exists() bool {
-	var count int
-
-	err := database.QueryRow("SELECT COUNT(id) FROM echos WHERE hash = ?", e.Hash).Scan(&count)
-	if err != nil {
-		return false
-	}
-
-	return count > 0
-}
-
-func (e *Echo) Delete() error {
-	_, err := database.Exec("DELETE FROM echos WHERE hash = ?", e.Hash)
+func (d *EchoDatabase) Delete(hash string) error {
+	_, err := database.Exec("DELETE FROM echos WHERE hash = ?", hash)
 	if err != nil {
 		return err
 	}

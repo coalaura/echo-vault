@@ -8,54 +8,41 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Echo struct {
-	ID         int64
-	Hash       string
-	Name       string
-	Extension  string
-	UploadSize int64
-	Timestamp  int64
-}
-
 func uploadHandler(c *gin.Context) {
-	token := c.PostForm("token")
-
-	if token != config.UploadToken {
-		errorResponse(c, 401, "invalid token")
-
-		return
-	}
-
 	echo, header, err := validateUpload(c)
 	if err != nil {
-		errorResponse(c, 400, err.Error())
+		fail(c, 400, err.Error())
 
 		return
 	}
 
-	err = echo.Create()
+	err = database.Create(echo)
 	if err != nil {
-		errorResponse(c, 500, err.Error())
+		fail(c, 500, err.Error())
 
 		return
 	}
 
 	err = c.SaveUploadedFile(header, echo.Storage())
 	if err != nil {
-		_ = echo.Delete()
+		_ = database.Delete(echo.Hash)
 
-		errorResponse(c, 500, err.Error())
+		fail(c, 500, err.Error())
 
 		return
 	}
 
 	echo.Compress()
 
-	uploadResponse(c, echo)
+	succeed(c, gin.H{
+		"hash":      echo.Hash,
+		"extension": echo.Extension,
+		"url":       echo.URL(),
+	})
 }
 
 func validateUpload(c *gin.Context) (*Echo, *multipart.FileHeader, error) {
-	header, err := c.FormFile("file")
+	header, err := c.FormFile("upload")
 	if err != nil {
 		return nil, nil, err
 	}
