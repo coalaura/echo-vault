@@ -27,10 +27,9 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) error {
 
 	switch e.Extension {
 	case "jpg", "png":
-		//e.Extension = "webp"
+		e.Extension = "webp"
 
-		//return saveImageAsWebP(file, e.Storage())
-		return saveFileAsFile(file, e.Storage())
+		return saveImageAsWebP(file, e.Storage())
 	case "gif":
 		return saveFileAsFile(file, e.Storage())
 	case "webp":
