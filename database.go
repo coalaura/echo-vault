@@ -109,3 +109,12 @@ func (d *EchoDatabase) Delete(hash string) error {
 
 	return nil
 }
+
+func (d *EchoDatabase) SetExtension(hash, extension string) error {
+	_, err := database.Exec("UPDATE echos SET extension = ? WHERE hash = ?", extension, hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

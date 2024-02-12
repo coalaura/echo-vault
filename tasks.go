@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,11 +24,6 @@ func handleTasks() {
 }
 
 func scanStorage() error {
-	var convertOnly bool
-
-	flag.BoolVar(&convertOnly, "convert-only", false, "Don't add new echos, only convert existing ones.")
-	flag.Parse()
-
 	log.Info("Scanning storage...")
 
 	var echos []Echo
@@ -53,6 +47,11 @@ func scanStorage() error {
 		if ext == ".webp" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" {
 			hash := strings.TrimSuffix(filepath.Base(path), ext)
 
+			// Same shit, different day
+			if ext == ".jpeg" {
+				ext = ".jpg"
+			}
+
 			echos = append(echos, Echo{
 				Hash:       hash,
 				Name:       info.Name(),
@@ -71,13 +70,16 @@ func scanStorage() error {
 	log.InfoF("Checking %d echos...\n", len(echos))
 
 	var (
-		convertedToWebP = 0
-
 		newEchos []Echo
 	)
 
 	for index, echo := range echos {
 		log.NoteF("%d of %d completed...\r", index+1, len(echos))
+
+		exists, err := database.Exists(echo.Hash)
+		if err != nil {
+			return err
+		}
 
 		if echo.Extension == "jpg" || echo.Extension == "png" {
 			err = convertEchoToWebP(&echo)
@@ -85,29 +87,16 @@ func scanStorage() error {
 				return err
 			}
 
-			convertedToWebP++
-		}
-
-		// Skip check if we are only converting
-		if !convertOnly {
-			exists, err := database.Exists(echo.Hash)
-			if err != nil {
-				return err
-			}
-
-			if !exists {
-				newEchos = append(newEchos, echo)
+			if exists {
+				err = database.SetExtension(echo.Hash, "webp")
+				if err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	if convertedToWebP > 0 {
-		log.InfoF("Updating %d webp echos...\n", convertedToWebP)
-
-		// Easier than tracking hashes and same result
-		_, err := database.Exec("UPDATE echos SET extension = ? WHERE extension IN (?, ?)", "webp", "jpg", "png")
-		if err != nil {
-			return err
+		if !exists {
+			newEchos = append(newEchos, echo)
 		}
 	}
 
