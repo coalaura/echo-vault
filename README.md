@@ -114,4 +114,18 @@ The backend also provides a few CLI commands to manage the database.
 
 ### `echo_vault scan`
 
-Scans the storage directory for images and adds them to the database. It also converts any existing png/jpg echos to webp (compressing them). This is useful if you already have a directory full of images and want to import them into the database. This may take a small moment depending on how many images you have. On a $5 digitalocean VM running ubuntu, it took about 1 minute and 30 seconds to scan 14,259 images (~158 images per second).
+Scans the storage directory for images and adds them to the database. It also converts any existing png/jpg echos to webp (compressing them). This is useful if you already have a directory full of images and want to import them into the database. Depending on how many images you have that need to be added/converted, this command may take a while to complete.
+
+You can also use a small bash script like this one, to convert all images in the storage to webp (decent bit faster than the go implementation):
+
+```bash
+cd storage
+
+for file in *.{jpg,jpeg,png}; do
+    if [ -e "$file" ]; then
+        echo $file
+
+        cwebp -q 80 $file -o "${file%.*}.webp" -quiet -mt && rm $file
+    fi
+done
+```
