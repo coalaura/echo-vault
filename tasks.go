@@ -76,7 +76,9 @@ func scanStorage() error {
 		newEchos []Echo
 	)
 
-	for _, echo := range echos {
+	for index, echo := range echos {
+		log.NoteF("%d of %d completed...\r", index+1, len(echos))
+
 		if echo.Extension == "jpg" || echo.Extension == "png" {
 			err = convertEchoToWebP(&echo)
 			if err != nil {
