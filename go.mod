@@ -3,6 +3,7 @@ module echovault
 go 1.21.1
 
 require (
+	github.com/chai2010/webp v1.1.1
 	github.com/coalaura/logger v1.0.0
 	github.com/gin-gonic/gin v1.9.1
 )
@@ -50,7 +51,7 @@ require (
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/sqlite v1.27.0
