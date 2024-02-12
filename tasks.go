@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,11 @@ func handleTasks() {
 }
 
 func scanStorage() error {
+	var convertOnly bool
+
+	flag.BoolVar(&convertOnly, "convert-only", false, "Don't add new echos, only convert existing ones.")
+	flag.Parse()
+
 	log.Info("Scanning storage...")
 
 	var echos []Echo
@@ -71,11 +77,6 @@ func scanStorage() error {
 	)
 
 	for _, echo := range echos {
-		dbEcho, err := database.Find(echo.Hash)
-		if err != nil {
-			return err
-		}
-
 		if echo.Extension == "jpg" || echo.Extension == "png" {
 			err = convertEchoToWebP(&echo)
 			if err != nil {
@@ -85,8 +86,16 @@ func scanStorage() error {
 			convertedToWebP++
 		}
 
-		if dbEcho == nil {
-			newEchos = append(newEchos, echo)
+		// Skip check if we are only converting
+		if !convertOnly {
+			exists, err := database.Exists(echo.Hash)
+			if err != nil {
+				return err
+			}
+
+			if !exists {
+				newEchos = append(newEchos, echo)
+			}
 		}
 	}
 
