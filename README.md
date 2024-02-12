@@ -24,8 +24,6 @@ A blazing fast minimal ShareX backend written in golang. This backend is designe
 
 ![sharex](.github/sharex.png)
 
-1.  If you want your screenshots to be automatically compressed you will have to install `pngquant` on your server. On ubuntu you can do this using `apt install pngquant`.
-
 ## Configuration
 
 When you run the program for the first time, it will generate a `config.json` file in the same directory as the executable. You can edit this file to change the configuration.
@@ -111,6 +109,6 @@ The backend also provides a few CLI commands to manage the database.
 
 Scans the storage directory for images and adds them to the database. This is useful if you already have a directory full of images and want to import them into the database. This may take a small moment depending on how many images you have. On a $5 digitalocean VM running ubuntu, it took about 1 minute and 30 seconds to scan 14,259 images (~158 images per second).
 
-If you have a bunch of uncompressed images that you just imported, you can use the [`compress.sh`](scripts/compress.sh) script to compress them. This script requires `pngquant` to be installed on your server. Since pngquant takes a moment to compress each image, depending on how many images you have, this may take a long while. On the same VM as above pngquant took just a little less than a second per image.
+If you have a bunch of uncompressed images that you just imported, you can use the [`compress.sh`](scripts/compress.sh) script to compress them. Depending on the amount of images, this may take a while.
 
 ![compress](.github/compress.png)

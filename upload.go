@@ -16,23 +16,19 @@ func uploadHandler(c *gin.Context) {
 		return
 	}
 
+	err = echo.SaveUploadedFile(header)
+	if err != nil {
+		fail(c, 500, err.Error())
+
+		return
+	}
+
 	err = database.Create(echo)
 	if err != nil {
 		fail(c, 500, err.Error())
 
 		return
 	}
-
-	err = c.SaveUploadedFile(header, echo.Storage())
-	if err != nil {
-		_ = database.Delete(echo.Hash)
-
-		fail(c, 500, err.Error())
-
-		return
-	}
-
-	echo.Compress()
 
 	succeed(c, gin.H{
 		"hash":      echo.Hash,
