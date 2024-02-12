@@ -99,12 +99,12 @@ func convertEchoToWebP(echo *Echo) error {
 		return err
 	}
 
-	defer file.Close()
-
 	echo.Extension = "webp"
 
 	err = saveImageAsWebP(file, echo.Storage())
 	if err != nil {
+		_ = file.Close()
+
 		return err
 	}
 
