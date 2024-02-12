@@ -108,7 +108,3 @@ The backend also provides a few CLI commands to manage the database.
 ### `echo_vault scan`
 
 Scans the storage directory for images and adds them to the database. This is useful if you already have a directory full of images and want to import them into the database. This may take a small moment depending on how many images you have. On a $5 digitalocean VM running ubuntu, it took about 1 minute and 30 seconds to scan 14,259 images (~158 images per second).
-
-If you have a bunch of uncompressed images that you just imported, you can use the [`compress.sh`](scripts/compress.sh) script to compress them. Depending on the amount of images, this may take a while.
-
-![compress](.github/compress.png)
