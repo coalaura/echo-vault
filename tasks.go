@@ -50,7 +50,7 @@ func scanStorage() error {
 
 		ext := filepath.Ext(path)
 
-		if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" {
+		if ext == ".webp" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" {
 			hash := strings.TrimSuffix(filepath.Base(path), ext)
 
 			echos = append(echos, Echo{
