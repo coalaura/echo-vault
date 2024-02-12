@@ -27,9 +27,10 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) error {
 
 	switch e.Extension {
 	case "jpg", "png":
-		e.Extension = "webp"
+		//e.Extension = "webp"
 
-		return saveImageAsWebP(file, e.Storage())
+		//return saveImageAsWebP(file, e.Storage())
+		return saveFileAsFile(file, e.Storage())
 	case "gif":
 		return saveFileAsFile(file, e.Storage())
 	case "webp":
@@ -87,4 +88,28 @@ func saveFileAsFile(file multipart.File, path string) error {
 	_, err = io.Copy(out, file)
 
 	return err
+}
+
+// For the scanner
+func convertEchoToWebP(echo *Echo) error {
+	source := echo.Storage()
+
+	file, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	echo.Extension = "webp"
+
+	err = saveImageAsWebP(file, echo.Storage())
+	if err != nil {
+		return err
+	}
+
+	_ = file.Close()
+	_ = os.Remove(source)
+
+	return nil
 }

@@ -53,7 +53,7 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 	var e Echo
 
-	err := d.QueryRow("SELECT id, hash, name, extension, upload_size, timestamp FROM echos WHERE hash = ?", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
+	err := d.QueryRow("SELECT id, hash, name, extension, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
