@@ -64,16 +64,39 @@ func scanStorage() error {
 
 	log.InfoF("Checking %d echos...\n", len(echos))
 
-	var newEchos []Echo
+	var (
+		convertedToWebP = 0
+
+		newEchos []Echo
+	)
 
 	for _, echo := range echos {
-		exists, err := database.Exists(echo.Hash)
+		dbEcho, err := database.Find(echo.Hash)
 		if err != nil {
 			return err
 		}
 
-		if !exists {
+		if echo.Extension == "jpg" || echo.Extension == "png" {
+			err = convertEchoToWebP(&echo)
+			if err != nil {
+				return err
+			}
+
+			convertedToWebP++
+		}
+
+		if dbEcho == nil {
 			newEchos = append(newEchos, echo)
+		}
+	}
+
+	if convertedToWebP > 0 {
+		log.InfoF("Updating %d webp echos...\n", convertedToWebP)
+
+		// Easier than tracking hashes and same result
+		_, err := database.Exec("UPDATE echos SET extension = ? WHERE extension IN (?, ?)", "webp", "jpg", "png")
+		if err != nil {
+			return err
 		}
 	}
 
