@@ -1,6 +1,6 @@
 ![banner](.github/banner.png)
 
-A blazing fast minimal ShareX backend written in golang. This backend is designed to be as minimal as possible and therefore does not provide a built-in UI. Instead, it provides a simple API that can be used to build a UI on top of it.
+A blazing fast minimal ShareX backend written in golang. This backend is designed to be as minimal as possible and therefore does not provide a built-in UI. Instead, it provides a simple API that can be used to build a UI on top of it. It also converts all uploaded images to webp for better compression and faster loading times.
 
 ## Features
 
