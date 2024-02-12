@@ -129,3 +129,9 @@ for file in *.{jpg,jpeg,png}; do
     fi
 done
 ```
+
+You'd then afterwards have to update the extensions in the database yourself like so:
+
+```sql
+UPDATE echos SET extension = "webp" WHERE extension IN ("png", "jpg");
+```
