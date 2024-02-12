@@ -52,6 +52,13 @@ The backend does not provide a route to view the uploaded images. For performanc
 location / {
     root /path/to/your/storage;
 
+    # Fix for old versions not using webp
+    if ($request_uri ~* ^(.+)\.(jpg|png)$) {
+        set $webp_uri $1.webp;
+
+        return 301 $webp_uri;
+    }
+
     expires 30d;
 }
 
