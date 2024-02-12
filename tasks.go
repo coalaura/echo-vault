@@ -71,10 +71,12 @@ func scanStorage() error {
 
 	var (
 		newEchos []Echo
+
+		convertedToWebP = 0
 	)
 
 	for index, echo := range echos {
-		log.NoteF("%d of %d completed...\r", index+1, len(echos))
+		log.NoteF("%d of %d\r", index+1, len(echos))
 
 		exists, err := database.Exists(echo.Hash)
 		if err != nil {
@@ -93,11 +95,17 @@ func scanStorage() error {
 					return err
 				}
 			}
+
+			convertedToWebP++
 		}
 
 		if !exists {
 			newEchos = append(newEchos, echo)
 		}
+	}
+
+	if convertedToWebP > 0 {
+		log.InfoF("Converted %d echos to webp.", convertedToWebP)
 	}
 
 	if len(newEchos) == 0 {
