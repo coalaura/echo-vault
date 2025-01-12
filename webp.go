@@ -44,7 +44,7 @@ func saveImageAsWebP(file multipart.File, path string) error {
 		return err
 	}
 
-	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
+	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func saveImageAsWebP(file multipart.File, path string) error {
 
 // ANY -> ANY
 func saveFileAsFile(file multipart.File, path string) error {
-	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0755)
+	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
