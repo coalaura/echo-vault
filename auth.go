@@ -1,27 +1,26 @@
 package main
 
 import (
+	"errors"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 )
 
-func authenticate(c *gin.Context) {
-	token := c.GetHeader("Authorization")
+func authenticate(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
 
 	if !strings.HasPrefix(token, "Bearer ") {
-		fail(c, 401, "missing token")
-
-		return
+		return errors.New("invalid token")
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
 
 	if token != config.UploadToken || token == "" {
-		fail(c, 401, "invalid token")
-
-		return
+		return errors.New("invalid token")
 	}
 
 	c.Next()
+
+	return nil
 }

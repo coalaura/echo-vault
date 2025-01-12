@@ -5,39 +5,35 @@ import (
 	"mime/multipart"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 )
 
-func uploadHandler(c *gin.Context) {
+func uploadHandler(c *fiber.Ctx) error {
 	echo, header, err := validateUpload(c)
 	if err != nil {
-		fail(c, 400, err.Error())
-
-		return
+		return err
 	}
 
 	err = echo.SaveUploadedFile(header)
 	if err != nil {
-		fail(c, 500, err.Error())
-
-		return
+		return err
 	}
 
 	err = database.Create(echo)
 	if err != nil {
-		fail(c, 500, err.Error())
-
-		return
+		return err
 	}
 
-	succeed(c, gin.H{
+	c.JSON(map[string]interface{}{
 		"hash":      echo.Hash,
 		"extension": echo.Extension,
 		"url":       echo.URL(),
 	})
+
+	return nil
 }
 
-func validateUpload(c *gin.Context) (*Echo, *multipart.FileHeader, error) {
+func validateUpload(c *fiber.Ctx) (*Echo, *multipart.FileHeader, error) {
 	header, err := c.FormFile("upload")
 	if err != nil {
 		return nil, nil, err

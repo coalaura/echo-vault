@@ -4,7 +4,9 @@ import (
 	"os"
 
 	"github.com/coalaura/logger"
-	"github.com/gin-gonic/gin"
+	adapter "github.com/coalaura/logger/fiber"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
 var (
@@ -15,9 +17,7 @@ var (
 )
 
 func main() {
-	_ = os.MkdirAll("./storage", 0755)
-
-	gin.SetMode(gin.ReleaseMode)
+	os.MkdirAll("./storage", 0755)
 
 	log.Info("Loading env...")
 	log.MustPanic(loadConfig())
@@ -27,19 +27,16 @@ func main() {
 
 	handleTasks()
 
-	log.Info("Configuring gin...")
+	app := fiber.New()
 
-	r := gin.New()
+	app.Use(recover.New())
+	app.Use(adapter.FiberMiddleware(log))
+	app.Use(authenticate)
 
-	r.Use(gin.Recovery())
-	r.Use(log.Middleware())
-	r.Use(authenticate)
+	app.Post("/upload", uploadHandler)
+	app.Get("/echos", listEchosHandler)
+	app.Delete("/echos/:hash", deleteEchoHandler)
 
-	r.POST("/upload", uploadHandler)
-
-	r.GET("/echos", listEchosHandler)
-	r.DELETE("/echos/:hash", deleteEchoHandler)
-
-	log.InfoF("Starting server at %s...\n", config.Addr())
-	log.MustPanic(r.Run(config.Addr()))
+	log.Infof("Starting server at %s...\n", config.Addr())
+	log.MustPanic(app.Listen(config.Addr()))
 }

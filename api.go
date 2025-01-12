@@ -1,53 +1,48 @@
 package main
 
 import (
-	"strconv"
+	"errors"
 
-	"github.com/gin-gonic/gin"
+	"github.com/gofiber/fiber/v2"
 )
 
-func listEchosHandler(c *gin.Context) {
-	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if err != nil {
-		fail(c, 400, "invalid page")
-
-		return
+func listEchosHandler(c *fiber.Ctx) error {
+	page := c.QueryInt("page", 1)
+	if page <= 0 {
+		return errors.New("invalid page")
 	}
 
 	echos, err := database.FindAll((page-1)*15, 15)
 	if err != nil {
-		fail(c, 500, err.Error())
-
-		return
+		return err
 	}
 
-	c.JSON(200, echos)
+	c.JSON(echos)
+
+	return nil
 }
 
-func deleteEchoHandler(c *gin.Context) {
-	hash := c.Param("hash")
-
+func deleteEchoHandler(c *fiber.Ctx) error {
+	hash := c.Query("hash")
 	if hash == "" {
-		fail(c, 400, "missing hash")
-
-		return
+		return errors.New("invalid hash")
 	}
 
 	echo, err := database.Find(hash)
 	if err != nil {
-		fail(c, 500, err.Error())
-
-		return
+		return err
 	}
 
 	if echo == nil {
-		fail(c, 404, "echo not found")
-
-		return
+		return errors.New("echo not found")
 	}
 
 	_ = echo.Unlink()
 	_ = database.Delete(hash)
 
-	c.JSON(200, gin.H{"success": true})
+	c.JSON(map[string]interface{}{
+		"success": true,
+	})
+
+	return nil
 }
