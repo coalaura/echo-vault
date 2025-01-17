@@ -9,18 +9,26 @@ import (
 )
 
 func uploadHandler(c *fiber.Ctx) error {
+	log.Debugf("Received upload request from %s\n", c.IP())
+
 	echo, header, err := validateUpload(c)
 	if err != nil {
+		log.Warningf("Failed to validate upload: %v\n", err)
+
 		return err
 	}
 
 	err = echo.SaveUploadedFile(header)
 	if err != nil {
+		log.Warningf("Failed to save uploaded file: %v\n", err)
+
 		return err
 	}
 
 	err = database.Create(echo)
 	if err != nil {
+		log.Warningf("Failed to create echo in database: %v\n", err)
+
 		return err
 	}
 

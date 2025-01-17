@@ -22,12 +22,16 @@ func main() {
 	log.Info("Loading env...")
 	log.MustPanic(loadConfig())
 
+	log.Infof("Using max file size: %dMB\n", config.MaxFileSizeMB)
+
 	log.Info("Connecting to database...")
 	log.MustPanic(connectToDatabase())
 
 	handleTasks()
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: int(config.MaxFileSize()),
+	})
 
 	app.Use(recover.New())
 	app.Use(adapter.FiberMiddleware(log))
