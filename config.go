@@ -11,6 +11,7 @@ type EchoConfig struct {
 	Port          int64  `json:"port"`
 	UploadToken   string `json:"upload_token"`
 	MaxFileSizeMB int64  `json:"max_file_size_mb"`
+	Quality       int64  `json:"quality"`
 }
 
 func loadConfig() error {
@@ -20,6 +21,7 @@ func loadConfig() error {
 		Port:          8080,
 		UploadToken:   "p4$$w0rd",
 		MaxFileSizeMB: 10,
+		Quality:       90,
 	}
 
 	if _, err := os.Stat("./config.json"); os.IsNotExist(err) {

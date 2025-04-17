@@ -44,6 +44,10 @@ The token that ShareX will use to authenticate with the server. This should be a
 
 The maximum file size in megabytes. If the file is larger than this, the server will return an error.
 
+### `quality`
+
+The quality of the WebP encoding. If set to 0 or less or 100 or more, encoding will be lossless (100). If set to a value between 1-99 that quality level is used.
+
 ## API
 
 The backend does not provide a route to view the uploaded images. For performance reasons this should be done through a reverse proxy like nginx.

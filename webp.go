@@ -51,10 +51,7 @@ func saveImageAsWebP(file multipart.File, path string) error {
 
 	defer out.Close()
 
-	return webp.Encode(out, img, webp.Options{
-		Quality: 90,
-		Method:  6,
-	})
+	return webp.Encode(out, img, getWebPOptions())
 }
 
 // ANY -> ANY
@@ -93,4 +90,19 @@ func convertEchoToWebP(echo *Echo) error {
 	_ = os.Remove(source)
 
 	return nil
+}
+
+func getWebPOptions() webp.Options {
+	opts := webp.Options{
+		Method: 6, // Max
+	}
+
+	if config.Quality <= 0 || config.Quality >= 100 {
+		opts.Lossless = true
+		opts.Exact = true
+	} else {
+		opts.Quality = int(config.Quality)
+	}
+
+	return opts
 }
