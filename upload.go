@@ -18,7 +18,7 @@ func uploadHandler(c *fiber.Ctx) error {
 		return err
 	}
 
-	err = echo.SaveUploadedFile(header)
+	err = echo.SaveUploadedFile(header, c.QueryBool("lossless"))
 	if err != nil {
 		log.Warningf("Failed to save uploaded file: %v\n", err)
 
