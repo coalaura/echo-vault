@@ -12,7 +12,7 @@ import (
 	"github.com/gen2brain/webp"
 )
 
-func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) error {
+func (e *Echo) SaveUploadedFile(header *multipart.FileHeader, lossless bool) error {
 	file, err := header.Open()
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) error {
 	case "jpg", "jpeg", "png", "webp":
 		e.Extension = "webp"
 
-		return saveImageAsWebP(file, e.Storage())
+		return saveImageAsWebP(file, e.Storage(), lossless)
 	case "gif":
 		return saveFileAsFile(file, e.Storage())
 	}
@@ -38,7 +38,7 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) error {
 }
 
 // PNG, JPG -> WebP
-func saveImageAsWebP(file multipart.File, path string) error {
+func saveImageAsWebP(file multipart.File, path string, lossless bool) error {
 	img, _, err := image.Decode(file)
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func saveImageAsWebP(file multipart.File, path string) error {
 
 	defer out.Close()
 
-	return webp.Encode(out, img, getWebPOptions())
+	return webp.Encode(out, img, getWebPOptions(lossless))
 }
 
 // ANY -> ANY
@@ -79,7 +79,7 @@ func convertEchoToWebP(echo *Echo) error {
 
 	echo.Extension = "webp"
 
-	err = saveImageAsWebP(file, echo.Storage())
+	err = saveImageAsWebP(file, echo.Storage(), false)
 	if err != nil {
 		_ = file.Close()
 
@@ -92,12 +92,12 @@ func convertEchoToWebP(echo *Echo) error {
 	return nil
 }
 
-func getWebPOptions() webp.Options {
+func getWebPOptions(lossless bool) webp.Options {
 	opts := webp.Options{
 		Method: 6, // Max
 	}
 
-	if config.Quality <= 0 || config.Quality >= 100 {
+	if lossless || config.Quality <= 0 || config.Quality >= 100 {
 		opts.Lossless = true
 		opts.Exact = true
 	} else {
