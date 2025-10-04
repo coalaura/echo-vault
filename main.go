@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"net/http"
 	"os"
 
@@ -14,6 +15,9 @@ var Version = "dev"
 var (
 	config   EchoConfig
 	database *EchoDatabase
+
+	//go:embed favicon.ico
+	favicon []byte
 
 	log = plain.New(plain.WithDate(plain.RFC3339Local))
 )
@@ -46,7 +50,11 @@ func main() {
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 
-	r.Get("/favicon.ico", viewEchoHandler)
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(favicon)
+	})
+
 	r.Get("/{hash}.{ext}", viewEchoHandler)
 
 	addr := config.Addr()
