@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -9,7 +10,7 @@ import (
 	"mime/multipart"
 	"os"
 
-	"github.com/gen2brain/webp"
+	"git.sr.ht/~jackmordaunt/go-libwebp/webp"
 )
 
 func (e *Echo) SaveUploadedFile(header *multipart.FileHeader, lossless bool) error {
@@ -34,7 +35,7 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader, lossless bool) err
 		return saveFileAsFile(file, e.Storage())
 	}
 
-	return nil
+	return fmt.Errorf("unsupported extension %q", e.Extension)
 }
 
 // PNG, JPG -> WebP
@@ -51,12 +52,12 @@ func saveImageAsWebP(file multipart.File, path string, lossless bool) error {
 
 	defer out.Close()
 
-	return webp.Encode(out, img, getWebPOptions(lossless))
+	return webp.Encode(out, img, getWebPOptions(lossless)...)
 }
 
 // ANY -> ANY
 func saveFileAsFile(file multipart.File, path string) error {
-	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
+	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,6 @@ func saveFileAsFile(file multipart.File, path string) error {
 	defer out.Close()
 
 	_, err = io.Copy(out, file)
-
 	return err
 }
 
@@ -72,36 +72,32 @@ func saveFileAsFile(file multipart.File, path string) error {
 func convertEchoToWebP(echo *Echo) error {
 	source := echo.Storage()
 
-	file, err := os.Open(source)
+	file, err := os.OpenFile(source, os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
+
+	defer file.Close()
 
 	echo.Extension = "webp"
 
 	err = saveImageAsWebP(file, echo.Storage(), false)
 	if err != nil {
-		_ = file.Close()
-
 		return err
 	}
 
-	_ = file.Close()
-	_ = os.Remove(source)
+	defer os.Remove(source)
 
 	return nil
 }
 
-func getWebPOptions(lossless bool) webp.Options {
-	opts := webp.Options{
-		Method: 6, // Max
-	}
+func getWebPOptions(lossless bool) []webp.EncodeOption {
+	var opts []webp.EncodeOption
 
 	if lossless || config.Quality <= 0 || config.Quality >= 100 {
-		opts.Lossless = true
-		opts.Exact = true
+		opts = append(opts, webp.Lossless())
 	} else {
-		opts.Quality = int(config.Quality)
+		opts = append(opts, webp.Quality(float32(config.Quality)/100))
 	}
 
 	return opts

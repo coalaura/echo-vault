@@ -3,8 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/coalaura/logger"
-	adapter "github.com/coalaura/logger/fiber"
+	"github.com/coalaura/plain"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -13,19 +12,19 @@ var (
 	config   EchoConfig
 	database *EchoDatabase
 
-	log = logger.New()
+	log = plain.New(plain.WithDate(plain.RFC3339Local))
 )
 
 func main() {
 	os.MkdirAll("./storage", 0755)
 
-	log.Info("Loading env...")
-	log.MustPanic(loadConfig())
+	log.Println("Loading env...")
+	log.MustFail(loadConfig())
 
-	log.Infof("Using max file size: %dMB\n", config.MaxFileSizeMB)
+	log.Printf("Using max file size: %dMB\n", config.MaxFileSizeMB)
 
-	log.Info("Connecting to database...")
-	log.MustPanic(connectToDatabase())
+	log.Println("Connecting to database...")
+	log.MustFail(connectToDatabase())
 
 	handleTasks()
 
@@ -34,13 +33,13 @@ func main() {
 	})
 
 	app.Use(recover.New())
-	app.Use(adapter.FiberMiddleware(log))
+	app.Use(log.Middleware())
 	app.Use(authenticate)
 
 	app.Post("/upload", uploadHandler)
 	app.Get("/echos", listEchosHandler)
 	app.Delete("/echos/:hash", deleteEchoHandler)
 
-	log.Infof("Starting server at %s...\n", config.Addr())
-	log.MustPanic(app.Listen(config.Addr()))
+	log.Printf("Starting server at %s...\n", config.Addr())
+	log.MustFail(app.Listen(config.Addr()))
 }

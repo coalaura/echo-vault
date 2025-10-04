@@ -15,16 +15,16 @@ func handleTasks() {
 
 	switch task {
 	case "scan":
-		log.MustPanic(scanStorage())
+		log.MustFail(scanStorage())
 	default:
-		log.Warningf("Unknown task: %s\n", task)
+		log.Warnf("Unknown task: %s\n", task)
 	}
 
 	os.Exit(0)
 }
 
 func scanStorage() error {
-	log.Info("Scanning storage...")
+	log.Println("Scanning storage...")
 
 	var echos []Echo
 
@@ -67,7 +67,7 @@ func scanStorage() error {
 		return err
 	}
 
-	log.Infof("Checking %d echos...\n", len(echos))
+	log.Printf("Checking %d echos...\n", len(echos))
 
 	var (
 		newEchos []Echo
@@ -76,7 +76,7 @@ func scanStorage() error {
 	)
 
 	for index, echo := range echos {
-		log.Notef("%d of %d\r", index+1, len(echos))
+		log.Printf("%d of %d\r", index+1, len(echos))
 
 		exists, err := database.Exists(echo.Hash)
 		if err != nil {
@@ -105,19 +105,19 @@ func scanStorage() error {
 	}
 
 	if convertedToWebP > 0 {
-		log.Infof("Converted %d echos to webp.\n", convertedToWebP)
+		log.Printf("Converted %d echos to webp.\n", convertedToWebP)
 	}
 
 	if len(newEchos) == 0 {
-		log.Info("No new echos found.")
+		log.Println("No new echos found.")
 
 		return nil
 	}
 
-	log.Infof("Creating %d new echos...\n", len(newEchos))
+	log.Printf("Creating %d new echos...\n", len(newEchos))
 
 	for i, echo := range newEchos {
-		log.Notef("[%d/%d] Creating echo %s...\n", i+1, len(newEchos), echo.Hash)
+		log.Printf("[%d/%d] Creating echo %s...\n", i+1, len(newEchos), echo.Hash)
 
 		err = database.Create(&echo)
 		if err != nil {
@@ -125,7 +125,7 @@ func scanStorage() error {
 		}
 	}
 
-	log.Info("Done.")
+	log.Println("Done.")
 
 	return nil
 }
