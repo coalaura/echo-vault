@@ -15,9 +15,9 @@ type EchoConfigServer struct {
 }
 
 type EchoConfigSettings struct {
-	Effort    uint8 `json:"effort"`
-	Quality   uint8 `json:"quality"`
-	EncodeGif bool  `json:"encode_gif"`
+	Effort      uint8 `json:"effort"`
+	Quality     uint8 `json:"quality"`
+	ReEncodeGif bool  `json:"re_encode_gif"`
 }
 
 type EchoConfig struct {
@@ -35,9 +35,9 @@ func loadConfig() error {
 			MaxFileSize: 10,
 		},
 		Settings: EchoConfigSettings{
-			Effort:    4,
-			Quality:   90,
-			EncodeGif: true,
+			Effort:      4,
+			Quality:     90,
+			ReEncodeGif: true,
 		},
 	}
 
@@ -67,12 +67,12 @@ func (e *EchoConfig) Store() error {
 	comments := yaml.CommentMap{
 		"$.server.url":           {yaml.HeadComment(" base url of your instance (default: http://localhost:8080)")},
 		"$.server.port":          {yaml.HeadComment(" port to run echo-vault on (default: 8080)")},
-		"$.server.token":         {yaml.HeadComment(" the upload token for authentication (default: p4$$w0rd)")},
-		"$.server.max_file_size": {yaml.HeadComment(" maximum upload file-size (in MB; default: 10MB)")},
+		"$.server.token":         {yaml.HeadComment(" upload token for authentication, leave empty to disable auth (default: p4$$w0rd)")},
+		"$.server.max_file_size": {yaml.HeadComment(" maximum upload file-size in MB (default: 10MB)")},
 
-		"$.settings.effort":     {yaml.HeadComment(" quality/speed trade-off (0 = fast, 6 = slower-better; default: 4)")},
-		"$.settings.quality":    {yaml.HeadComment(" what quality setting to use for webp (0-100, 100 = lossless; default: 90)")},
-		"$.settings.encode_gif": {yaml.HeadComment(" encode gif's as webp animations (default: true)")},
+		"$.settings.effort":        {yaml.HeadComment(" quality/speed trade-off (0 = fast, 6 = slower-better; default: 4)")},
+		"$.settings.quality":       {yaml.HeadComment(" webp quality (0-100, 100 = lossless; default: 90)")},
+		"$.settings.re_encode_gif": {yaml.HeadComment(" re-encode gif's (removes metadata, cleans uploaded gif; default: true)")},
 	}
 
 	file, err := os.OpenFile("config.yml", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)

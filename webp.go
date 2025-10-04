@@ -4,15 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
 	"io"
 	"mime/multipart"
 	"os"
 
+	"image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 
-	"github.com/HugoSmits86/nativewebp"
 	"github.com/gen2brain/webp"
 )
 
@@ -37,10 +36,8 @@ func (e *Echo) SaveUploadedFile(header *multipart.FileHeader) (int, error) {
 
 		return saveImageAsWebP(file, e.Storage())
 	case "gif":
-		if config.Settings.EncodeGif {
-			e.Extension = "webp"
-
-			return saveGifAsWebP(file, e.Storage())
+		if config.Settings.ReEncodeGif {
+			return saveGifAsGif(file, e.Storage())
 		}
 
 		return saveFileAsFile(file, e.Storage())
@@ -70,42 +67,11 @@ func saveImageAsWebP(file multipart.File, path string) (int, error) {
 	return wr.N, err
 }
 
-// GIF -> WebP
-func saveGifAsWebP(file multipart.File, path string) (int, error) {
+// GIF -> GIF (re-encode, remove metadata)
+func saveGifAsGif(file multipart.File, path string) (int, error) {
 	img, err := gif.DecodeAll(file)
 	if err != nil {
 		return 0, err
-	}
-
-	images := make([]image.Image, len(img.Image))
-	durations := make([]uint, len(img.Image))
-	disposals := make([]uint, len(img.Image))
-
-	for i, frame := range img.Image {
-		images[i] = frame
-
-		// GIF delay is in 100ths of a second, WebP uses milliseconds
-		durations[i] = uint(img.Delay[i] * 10)
-		disposals[i] = uint(img.Disposal[i])
-	}
-
-	var loopCount uint16
-
-	switch img.LoopCount {
-	case -1: // GIF: -1 = play once, WebP: 1 = play once
-		loopCount = 1
-	case 0: // GIF: 0 = loop forever, WebP: 0 = loop forever
-		loopCount = 0
-	default:
-		loopCount = uint16(img.LoopCount)
-	}
-
-	animation := &nativewebp.Animation{
-		Images:          images,
-		Durations:       durations,
-		Disposals:       disposals,
-		LoopCount:       loopCount,
-		BackgroundColor: uint32(img.BackgroundIndex) << 24, // Convert index to RGBA
 	}
 
 	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
@@ -117,7 +83,7 @@ func saveGifAsWebP(file multipart.File, path string) (int, error) {
 
 	wr := NewCountWriter(out)
 
-	err = nativewebp.EncodeAll(wr, animation, nil)
+	err = gif.EncodeAll(wr, img)
 
 	return wr.N, err
 }
@@ -152,11 +118,11 @@ func convertEchoToWebP(echo *Echo) (bool, error) {
 	handler := saveImageAsWebP
 
 	if echo.Extension == "gif" {
-		if !config.Settings.EncodeGif {
+		if !config.Settings.ReEncodeGif {
 			return false, nil
 		}
 
-		handler = saveGifAsWebP
+		handler = saveGifAsGif
 	}
 
 	echo.Extension = "webp"
