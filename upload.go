@@ -9,25 +9,25 @@ import (
 )
 
 func uploadHandler(c *fiber.Ctx) error {
-	log.Debugf("Received upload request from %s\n", c.IP())
+	log.Printf("Received upload request from %s\n", c.IP())
 
 	echo, header, err := validateUpload(c)
 	if err != nil {
-		log.Warningf("Failed to validate upload: %v\n", err)
+		log.Warnf("Failed to validate upload: %v\n", err)
 
 		return err
 	}
 
 	err = echo.SaveUploadedFile(header, c.QueryBool("lossless"))
 	if err != nil {
-		log.Warningf("Failed to save uploaded file: %v\n", err)
+		log.Warnf("Failed to save uploaded file: %v\n", err)
 
 		return err
 	}
 
 	err = database.Create(echo)
 	if err != nil {
-		log.Warningf("Failed to create echo in database: %v\n", err)
+		log.Warnf("Failed to create echo in database: %v\n", err)
 
 		return err
 	}
@@ -81,7 +81,7 @@ func validateUpload(c *fiber.Ctx) (*Echo, *multipart.FileHeader, error) {
 	case "image/webp":
 		echo.Extension = "webp"
 	default:
-		return nil, nil, fmt.Errorf("invalid file type '%s'", contentType)
+		return nil, nil, fmt.Errorf("invalid file type %q", contentType)
 	}
 
 	return &echo, header, nil
