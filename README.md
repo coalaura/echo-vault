@@ -1,34 +1,31 @@
 ![banner](.github/banner.png)
 
-A blazing fast minimal ShareX backend written in golang. This backend is designed to be as minimal as possible and therefore does not provide a built-in UI. Instead, it provides a simple API that can be used to build a UI on top of it. It also converts all uploaded images to webp for better compression and faster loading times.
+A blazing fast minimal ShareX backend written in Go. Echo-Vault keeps the moving parts lean: it stores uploads, exposes a tiny API, and lets a reverse proxy handle the heavy lifting. Images are converted to WebP by default for small file sizes and quick delivery, with optional GIF re-encoding to scrub metadata.
 
 ## Features
 
-+ Import existing images
-+ Minimal setup & config
-+ Optional image compression
-+ ... and more!
+- Drop-in ShareX uploader with bearer-token auth
+- Automatic WebP conversion with configurable quality/effort
+- Optional GIF re-encoding (or keep original GIFs intact)
+- Import existing files straight into the database
+- Commented `config.yml` generated on first run
 
 ## Installation
 
-1. Download the [latest release](https://github.com/coalaura/echo-vault/releases/latest) or compile it yourself
-2. Run the binary once to generate a config file
-3. Edit the config file to your liking
-4. Upload the [echo_vault.service](echo_vault.service) file to the same directory as the binary
-5. Allow the binary to be executed using `chmod +x echo_vault`
-6. Adjust the path in the service file to the path of the binary
-7. Create a symlink to the service file using `ln -s /path/to/echo_vault.service /etc/systemd/system/echo_vault.service`
-8. Start the service using `service echo_vault start`
-9. Configure nginx (or your reverse proxy of choice) to proxy requests to the backend
-10. Configure ShareX to use the backend
+1. Download the [latest release](https://github.com/coalaura/echo-vault/releases/latest) or build from source.
+2. Run the binary once in the target directory to create `config.yml` and the `storage/` folder.
+3. Edit `config.yml` to match your domain, port, and upload token.
+4. (Optional) Install the provided [echo_vault.service](echo_vault.service) unit next to the binary.
+5. Make the binary executable: `chmod +x echo_vault`.
+6. Update the service file paths, symlink it into `/etc/systemd/system/`, and start it (`service echo_vault start`).
+7. Point nginx (or another reverse proxy) at the backend (config below).
+8. Configure ShareX to send uploads to your instance using the bearer token.
 
 ![sharex](.github/sharex.png)
 
 ## Configuration
 
-When you run the program for the first time, it will generate a `config.yml` file in the same directory as the executable. You can edit this file to adjust the behavior of the server.
-
-Below is an example configuration:
+Running Echo-Vault creates a commented `config.yml` beside the binary. Adjust it and restart the service.
 
 ```yaml
 server:
@@ -38,45 +35,45 @@ server:
   # port to run echo-vault on (default: 8080)
   port: 8080
 
-  # the upload token for authentication (default: p4$$w0rd)
+  # upload token for authentication, leave empty to disable auth (default: p4$$w0rd)
   token: p4$$w0rd
 
-  # maximum upload file-size (in MB; default: 10MB)
+  # maximum upload file-size in MB (default: 10MB)
   max_file_size: 10
 
 settings:
   # quality/speed trade-off (0 = fast, 6 = slower-better; default: 4)
   effort: 4
 
-  # what quality setting to use for webp (0-100, 100 = lossless; default: 90)
+  # webp quality (0-100, 100 = lossless; default: 90)
   quality: 90
 
-  # encode gif's as webp animations (default: true)
-  encode_gif: true
+  # re-encode gif uploads to strip metadata (default: true)
+  re_encode_gif: true
 ```
 
 ### `server` section
 
 | Key | Type | Default | Description |
-|-----|------|----------|-------------|
-| `url` | string | `http://localhost:8080` | Base URL of your instance, used to build image URLs. Include the protocol (e.g. `https://example.com`). |
-| `port` | int | `8080` | Port that echo-vault should listen on. |
-| `token` | string | `p4$$w0rd` | Authentication token used for uploads. Change this to a strong random value. ShareX must use this value in the `Authorization: Bearer <token>` header. |
-| `max_file_size` | int | `10` | Maximum allowed upload size (in MB). Larger uploads are rejected. |
+|-----|------|---------|-------------|
+| `url` | string | `http://localhost:8080` | Public base URL used when generating response links. |
+| `port` | int | `8080` | Port Echo-Vault listens on. |
+| `token` | string | `p4$$w0rd` | Bearer token required for uploads and management endpoints. Leave empty to disable auth (not recommended). |
+| `max_file_size` | int | `10` | Reject uploads larger than this limit in MB. |
 
 ### `settings` section
 
 | Key | Type | Default | Description |
-|-----|------|----------|-------------|
-| `effort` | int (0-6) | `4` | Compression effort (speed vs quality). Higher = slower but better compression. |
-| `quality` | int (0-100) | `90` | WebP quality level. `100` is lossless; values near 90 balance size and quality. |
-| `encode_gif` | bool | `true` | If enabled, GIFs are converted to animated WebP files. |
+|-----|------|---------|-------------|
+| `effort` | int (0-6) | `4` | WebP encoder speed/quality trade-off (`6` squeezes the best compression). |
+| `quality` | int (0-100) | `90` | WebP quality; `100` switches to lossless mode automatically. |
+| `re_encode_gif` | bool | `true` | Re-save GIFs to strip metadata (set `false` to keep originals). |
 
-By default, echo-vault listens on port `8080` and serves directly unless you place it behind a reverse proxy like nginx. Make sure to adjust the `url` and `token` values before deployment for security and correct URL generation.
+Echo-Vault stores files inside the `storage/` directory (created automatically). You can symlink this folder if you prefer a different location.
 
 ## API
 
-The backend does not provide a route to view the uploaded images. For performance reasons this should be done through a reverse proxy like nginx.
+Serve static files directly through nginx-Echo-Vault also exposes `/{hash}.{ext}` (`ext` = `webp` or `gif`) for completeness, but letting nginx handle static files is faster. Keep the proxy routing limited to uploads and database-backed endpoints:
 
 ```nginx
 location / {
@@ -99,21 +96,26 @@ location ~ ^/(upload|echos) {
 }
 ```
 
+### Authentication
+
+All API routes under `/upload` and `/echos` expect `Authorization: Bearer <token>` unless `token` is empty.
+
 ### `POST /upload`
 
-Uploads an image to the server. The image should be sent as a multipart form with the key `upload`. A successful response will look like this:
+Upload an image via multipart form (`upload=<file>`). Supported types: JPEG, PNG, GIF, WebP. Responses include the canonical hash, stored extension, URL, and formatted size:
 
 ```json
 {
-    "extension": "png",
     "hash": "AXHN6RKPCT",
-    "url": "http://localhost:8080/AXHN6RKPCT.png"
+    "extension": "webp",
+    "url": "https://example.com/AXHN6RKPCT.webp",
+    "size": "842.3 kB"
 }
 ```
 
-### `GET /echos`
+### `GET /echos/{page}`
 
-Lists all uploaded images, ordered by timestamp desc. Returns max 15 results. Pagination is done by sending the `page` query parameter. A successful response will look like this:
+Returns up to 15 uploads per page (1-indexed). Example response:
 
 ```json
 [
@@ -121,47 +123,21 @@ Lists all uploaded images, ordered by timestamp desc. Returns max 15 results. Pa
         "id": 8,
         "hash": "3ZFPMNRGFJ",
         "name": "2023-11-24 00_04_28.png",
-        "extension": "png",
+        "extension": "webp",
         "upload_size": 4818389,
         "timestamp": 1701110029
     }
 ]
 ```
 
-### `DELETE /echos/:hash`
+### `DELETE /echos/{hash}`
 
-Deletes an uploaded image. The `:hash` parameter should be the hash of the image. A successful response will look like this:
-
-```json
-{
-    "success": true
-}
-```
+Removes both the file and its database entry. A successful deletion replies with `200 OK` and an empty body.
 
 ## CLI
 
-The backend also provides a few CLI commands to manage the database.
+Echo-Vault doubles as a tiny maintenance tool when invoked with commands:
 
-### `echo_vault scan`
+### `echo-vault scan`
 
-Scans the storage directory for images and adds them to the database. It also converts any existing png/jpg echos to webp (compressing them). This is useful if you already have a directory full of images and want to import them into the database. Depending on how many images you have that need to be added/converted, this command may take a while to complete.
-
-You can also use a small bash script like this one, to convert all images in the storage to webp (decent bit faster than the go implementation):
-
-```bash
-cd storage
-
-for file in *.{jpg,jpeg,png}; do
-    if [ -e "$file" ]; then
-        echo $file
-
-        cwebp -q 80 $file -o "${file%.*}.webp" -quiet -mt && rm $file
-    fi
-done
-```
-
-You'd then afterwards have to update the extensions in the database yourself like so:
-
-```sql
-UPDATE echos SET extension = "webp" WHERE extension IN ("png", "jpg");
-```
+Walks the `storage/` directory, imports missing files into the database, and converts PNG/JPG/GIF files to WebP/GIF (respecting `re_encode_gif`). Progress is logged to stdout.

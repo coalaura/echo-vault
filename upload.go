@@ -77,7 +77,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 
-		log.Warnf("upload: failed to save uploaded file: %v\n", err)
+		log.Warnln("upload: failed to save uploaded file")
 		log.Warnln(err)
 
 		return
@@ -87,7 +87,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 
-		log.Warnf("upload: failed to create echo in database: %v\n", err)
+		log.Warnln("upload: failed to create echo in database")
 		log.Warnln(err)
 
 		return
