@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build:
+    needs: test
     runs-on: ubuntu-latest
 
     strategy:
@@ -25,13 +26,15 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.25.0'
+        go-version-file: 'go.mod'
 
     - name: Build ${{ matrix.goos }}_${{ matrix.goarch }}
       shell: bash
       run: |
         mkdir -p build
         [[ "${{ matrix.goos }}" == "windows" ]] && EXT=".exe" || EXT=""
+
+        OUT="build/echo_vault_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
 
         GOOS=${{ matrix.goos }} \
         GOARCH=${{ matrix.goarch }} \
@@ -40,7 +43,7 @@ jobs:
           -trimpath \
           -buildvcs=false \
           -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}'" \
-          -o "build/echo_vault${EXT}" .
+          -o "$OUT" .
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
