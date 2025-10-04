@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-const StorageDirectory = "./storage"
+const StorageDirectory = "storage"
 
 func storageAbs() (string, error) {
 	info, err := os.Lstat(StorageDirectory)

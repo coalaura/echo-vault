@@ -1,75 +1,60 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"mime/multipart"
 	"net/http"
-
-	"github.com/gofiber/fiber/v2"
 )
 
-func uploadHandler(c *fiber.Ctx) error {
-	log.Printf("Received upload request from %s\n", c.IP())
-
-	echo, header, err := validateUpload(c)
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		log.Warnf("Failed to validate upload: %v\n", err)
+		w.WriteHeader(http.StatusBadRequest)
 
-		return err
+		log.Warnln("upload: failed to read form")
+		log.Warnln(err)
+
+		return
 	}
 
-	err = echo.SaveUploadedFile(header, c.QueryBool("lossless"))
+	file, header, err := r.FormFile("upload")
 	if err != nil {
-		log.Warnf("Failed to save uploaded file: %v\n", err)
+		w.WriteHeader(http.StatusBadRequest)
 
-		return err
-	}
+		log.Warnln("upload: failed to read file")
+		log.Warnln(err)
 
-	err = database.Create(echo)
-	if err != nil {
-		log.Warnf("Failed to create echo in database: %v\n", err)
-
-		return err
-	}
-
-	c.JSON(map[string]interface{}{
-		"hash":      echo.Hash,
-		"extension": echo.Extension,
-		"url":       echo.URL(),
-	})
-
-	return nil
-}
-
-func validateUpload(c *fiber.Ctx) (*Echo, *multipart.FileHeader, error) {
-	header, err := c.FormFile("upload")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if header.Size > config.MaxFileSize() {
-		return nil, nil, fmt.Errorf("file too large")
-	}
-
-	file, err := header.Open()
-	if err != nil {
-		return nil, nil, err
+		return
 	}
 
 	defer file.Close()
 
-	buffer := make([]byte, 512)
-	_, err = file.Read(buffer)
-	if err != nil {
-		return nil, nil, err
+	if header.Size > config.MaxFileSizeBytes() {
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+
+		log.Warnln("upload: file too big")
+
+		return
 	}
 
-	echo := Echo{
+	var tmp [64]byte
+
+	n, err := file.Read(tmp[:])
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+
+		log.Warnln("upload: failed to read file header")
+		log.Warnln(err)
+
+		return
+	}
+
+	echo := &Echo{
 		Name:       header.Filename,
 		UploadSize: header.Size,
 	}
 
-	contentType := http.DetectContentType(buffer)
+	contentType := http.DetectContentType(tmp[:n])
 
 	switch contentType {
 	case "image/jpeg":
@@ -81,8 +66,54 @@ func validateUpload(c *fiber.Ctx) (*Echo, *multipart.FileHeader, error) {
 	case "image/webp":
 		echo.Extension = "webp"
 	default:
-		return nil, nil, fmt.Errorf("invalid file type %q", contentType)
+		w.WriteHeader(http.StatusBadRequest)
+
+		log.Warnf("upload: invalid file type %q", contentType)
+
+		return
 	}
 
-	return &echo, header, nil
+	size, err := echo.SaveUploadedFile(header)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnf("upload: failed to save uploaded file: %v\n", err)
+		log.Warnln(err)
+
+		return
+	}
+
+	err = database.Create(echo)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnf("upload: failed to create echo in database: %v\n", err)
+		log.Warnln(err)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"hash":      echo.Hash,
+		"extension": echo.Extension,
+		"url":       echo.URL(),
+		"size":      byteCountSI(size),
+	})
+}
+
+func byteCountSI(b int) string {
+	if b < 1000 {
+		return fmt.Sprintf("%d B", b)
+	}
+
+	div, exp := 1000, 0
+
+	for n := b / 1000; n >= 1000; n /= 1000 {
+		div *= 1000
+		exp++
+	}
+
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "kMGTPE"[exp])
 }

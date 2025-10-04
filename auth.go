@@ -1,26 +1,34 @@
 package main
 
 import (
-	"errors"
+	"net/http"
 	"strings"
-
-	"github.com/gofiber/fiber/v2"
 )
 
-func authenticate(c *fiber.Ctx) error {
-	token := c.Get("Authorization")
+func authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isAuthenticated(r) {
+			w.WriteHeader(http.StatusUnauthorized)
+
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isAuthenticated(r *http.Request) bool {
+	if config.Server.UploadToken == "" {
+		return true
+	}
+
+	token := r.Header.Get("Authorization")
 
 	if !strings.HasPrefix(token, "Bearer ") {
-		return errors.New("invalid token")
+		return false
 	}
 
 	token = strings.TrimPrefix(token, "Bearer ")
 
-	if token != config.UploadToken || token == "" {
-		return errors.New("invalid token")
-	}
-
-	c.Next()
-
-	return nil
+	return token == config.Server.UploadToken
 }

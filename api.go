@@ -1,48 +1,149 @@
 package main
 
 import (
-	"errors"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/go-chi/chi/v5"
 )
 
-func listEchosHandler(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	if page <= 0 {
-		return errors.New("invalid page")
+func viewEchoHandler(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	if !validateHash(hash) {
+		w.WriteHeader(http.StatusBadRequest)
+
+		log.Warnln("view: invalid hash")
+
+		return
 	}
+
+	ext := chi.URLParam(r, "ext")
+	if ext != "webp" && ext != "gif" {
+		w.WriteHeader(http.StatusBadRequest)
+
+		log.Warnln("view: invalid extension")
+
+		return
+	}
+
+	storage, err := storageAbs()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnln("view: failed to resolve storage")
+		log.Warnln(err)
+
+		return
+	}
+
+	path := filepath.Join(storage, hash+"."+ext)
+
+	file, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		if os.IsNotExist(err) {
+			w.WriteHeader(http.StatusNotFound)
+
+			return
+		}
+
+		log.Warnln("view: failed to open file")
+		log.Warnln(err)
+
+		return
+	}
+
+	defer file.Close()
+
+	w.WriteHeader(http.StatusOK)
+
+	io.Copy(w, file)
+}
+
+func listEchosHandler(w http.ResponseWriter, r *http.Request) {
+	var page int
+
+	if raw := chi.URLParam(r, "page"); raw != "" {
+		num, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+
+			log.Warnln("list: invalid page number")
+			log.Warnln(err)
+
+			return
+		}
+
+		page = int(num)
+	}
+
+	page = max(1, page)
 
 	echos, err := database.FindAll((page-1)*15, 15)
 	if err != nil {
-		return err
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnln("list: failed to read echos")
+		log.Warnln(err)
+
+		return
 	}
 
-	c.JSON(echos)
+	w.WriteHeader(http.StatusOK)
 
-	return nil
+	json.NewEncoder(w).Encode(echos)
 }
 
-func deleteEchoHandler(c *fiber.Ctx) error {
-	hash := c.Query("hash")
-	if hash == "" {
-		return errors.New("invalid hash")
+func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	if !validateHash(hash) {
+		w.WriteHeader(http.StatusBadRequest)
+
+		log.Warnln("delete: invalid hash")
+
+		return
 	}
 
 	echo, err := database.Find(hash)
 	if err != nil {
-		return err
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnln("delete: failed to find echo")
+		log.Warnln(err)
+
+		return
 	}
 
 	if echo == nil {
-		return errors.New("echo not found")
+		w.WriteHeader(http.StatusNotFound)
+
+		log.Warnf("delete: echo %q not found\n", hash)
+
+		return
 	}
 
-	_ = echo.Unlink()
-	_ = database.Delete(hash)
+	err = echo.Unlink()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 
-	c.JSON(map[string]interface{}{
-		"success": true,
-	})
+		log.Warnln("delete: failed to unlink echo")
+		log.Warnln(err)
 
-	return nil
+		return
+	}
+
+	err = database.Delete(hash)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+
+		log.Warnln("delete: failed to delete echo")
+		log.Warnln(err)
+
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

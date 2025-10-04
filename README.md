@@ -11,7 +11,7 @@ A blazing fast minimal ShareX backend written in golang. This backend is designe
 
 ## Installation
 
-1. Download the [precompiled binary](bin/echo_vault) or compile it yourself
+1. Download the [latest release](https://github.com/coalaura/echo-vault/releases/latest) or compile it yourself
 2. Run the binary once to generate a config file
 3. Edit the config file to your liking
 4. Upload the [echo_vault.service](echo_vault.service) file to the same directory as the binary
@@ -26,27 +26,53 @@ A blazing fast minimal ShareX backend written in golang. This backend is designe
 
 ## Configuration
 
-When you run the program for the first time, it will generate a `config.json` file in the same directory as the executable. You can edit this file to change the configuration.
+When you run the program for the first time, it will generate a `config.yml` file in the same directory as the executable. You can edit this file to adjust the behavior of the server.
 
-### `base_url`
+Below is an example configuration:
 
-The base URL of the server. This is used to generate the URL of the uploaded image. This should be the URL of the server, including the protocol (e.g. `https://example.com`).
+```yaml
+server:
+  # base url of your instance (default: http://localhost:8080)
+  url: http://localhost:8080
 
-### `port`
+  # port to run echo-vault on (default: 8080)
+  port: 8080
 
-The port to run the server on. This should be a number between 1 and 65535. If you are running the server behind a reverse proxy, you should set this to the port that the reverse proxy is targeting.
+  # the upload token for authentication (default: p4$$w0rd)
+  token: p4$$w0rd
 
-### `upload_token`
+  # maximum upload file-size (in MB; default: 10MB)
+  max_file_size: 10
 
-The token that ShareX will use to authenticate with the server. This should be a random string of characters. Default is `p4$$w0rd`, but you should change this to something else. Authentication is done by sending the token as a Bearer token in the `Authorization` header.
+settings:
+  # quality/speed trade-off (0 = fast, 6 = slower-better; default: 4)
+  effort: 4
 
-### `max_file_size_mb`
+  # what quality setting to use for webp (0-100, 100 = lossless; default: 90)
+  quality: 90
 
-The maximum file size in megabytes. If the file is larger than this, the server will return an error.
+  # encode gif's as webp animations (default: true)
+  encode_gif: true
+```
 
-### `quality`
+### `server` section
 
-The quality of the WebP encoding. If set to 0 or less or 100 or more, encoding will be lossless (100). If set to a value between 1-99 that quality level is used.
+| Key | Type | Default | Description |
+|-----|------|----------|-------------|
+| `url` | string | `http://localhost:8080` | Base URL of your instance, used to build image URLs. Include the protocol (e.g. `https://example.com`). |
+| `port` | int | `8080` | Port that echo-vault should listen on. |
+| `token` | string | `p4$$w0rd` | Authentication token used for uploads. Change this to a strong random value. ShareX must use this value in the `Authorization: Bearer <token>` header. |
+| `max_file_size` | int | `10` | Maximum allowed upload size (in MB). Larger uploads are rejected. |
+
+### `settings` section
+
+| Key | Type | Default | Description |
+|-----|------|----------|-------------|
+| `effort` | int (0-6) | `4` | Compression effort (speed vs quality). Higher = slower but better compression. |
+| `quality` | int (0-100) | `90` | WebP quality level. `100` is lossless; values near 90 balance size and quality. |
+| `encode_gif` | bool | `true` | If enabled, GIFs are converted to animated WebP files. |
+
+By default, echo-vault listens on port `8080` and serves directly unless you place it behind a reverse proxy like nginx. Make sure to adjust the `url` and `token` values before deployment for security and correct URL generation.
 
 ## API
 

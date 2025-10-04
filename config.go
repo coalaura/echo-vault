@@ -1,47 +1,86 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/goccy/go-yaml"
 )
 
+type EchoConfigServer struct {
+	URL         string `json:"url"`
+	Port        uint16 `json:"port"`
+	UploadToken string `json:"token"`
+	MaxFileSize uint32 `json:"max_file_size"`
+}
+
+type EchoConfigSettings struct {
+	Effort    uint8 `json:"effort"`
+	Quality   uint8 `json:"quality"`
+	EncodeGif bool  `json:"encode_gif"`
+}
+
 type EchoConfig struct {
-	BaseURL       string `json:"base_url"`
-	Port          int64  `json:"port"`
-	UploadToken   string `json:"upload_token"`
-	MaxFileSizeMB int64  `json:"max_file_size_mb"`
-	Quality       int64  `json:"quality"`
+	Server   EchoConfigServer   `json:"server"`
+	Settings EchoConfigSettings `json:"settings"`
 }
 
 func loadConfig() error {
 	// Defaults
 	config = EchoConfig{
-		BaseURL:       "http://localhost:8080",
-		Port:          8080,
-		UploadToken:   "p4$$w0rd",
-		MaxFileSizeMB: 10,
-		Quality:       90,
+		Server: EchoConfigServer{
+			URL:         "http://localhost:8080",
+			Port:        8080,
+			UploadToken: "p4$$w0rd",
+			MaxFileSize: 10,
+		},
+		Settings: EchoConfigSettings{
+			Effort:    4,
+			Quality:   90,
+			EncodeGif: true,
+		},
 	}
 
-	if _, err := os.Stat("./config.json"); os.IsNotExist(err) {
-		b, _ := json.MarshalIndent(config, "", "\t")
+	file, err := os.OpenFile("config.yml", os.O_RDONLY, 0)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return config.Store()
+		}
 
-		return os.WriteFile("./config.json", b, 0644)
+		return err
 	}
 
-	b, err := os.ReadFile("./config.json")
+	defer file.Close()
+
+	return yaml.NewDecoder(file).Decode(&config)
+}
+
+func (c *EchoConfig) MaxFileSizeBytes() int64 {
+	return int64(c.Server.MaxFileSize * 1024 * 1024)
+}
+
+func (c *EchoConfig) Addr() string {
+	return fmt.Sprintf(":%d", c.Server.Port)
+}
+
+func (e *EchoConfig) Store() error {
+	comments := yaml.CommentMap{
+		"$.server.url":           {yaml.HeadComment(" base url of your instance (default: http://localhost:8080)")},
+		"$.server.port":          {yaml.HeadComment(" port to run echo-vault on (default: 8080)")},
+		"$.server.token":         {yaml.HeadComment(" the upload token for authentication (default: p4$$w0rd)")},
+		"$.server.max_file_size": {yaml.HeadComment(" maximum upload file-size (in MB; default: 10MB)")},
+
+		"$.settings.effort":     {yaml.HeadComment(" quality/speed trade-off (0 = fast, 6 = slower-better; default: 4)")},
+		"$.settings.quality":    {yaml.HeadComment(" what quality setting to use for webp (0-100, 100 = lossless; default: 90)")},
+		"$.settings.encode_gif": {yaml.HeadComment(" encode gif's as webp animations (default: true)")},
+	}
+
+	file, err := os.OpenFile("config.yml", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
-	return json.Unmarshal(b, &config)
-}
+	defer file.Close()
 
-func (c *EchoConfig) MaxFileSize() int64 {
-	return c.MaxFileSizeMB * 1024 * 1024
-}
-
-func (c *EchoConfig) Addr() string {
-	return fmt.Sprintf(":%d", c.Port)
+	return yaml.NewEncoder(file, yaml.WithComment(comments)).Encode(e)
 }

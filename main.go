@@ -1,12 +1,15 @@
 package main
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/coalaura/plain"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
+
+var Version = "dev"
 
 var (
 	config   EchoConfig
@@ -16,30 +19,38 @@ var (
 )
 
 func main() {
+	log.Printf("Echo-Vault %s\n", Version)
+
 	os.MkdirAll("./storage", 0755)
 
 	log.Println("Loading env...")
 	log.MustFail(loadConfig())
 
-	log.Printf("Using max file size: %dMB\n", config.MaxFileSizeMB)
+	log.Printf("Using max file size: %dMB\n", config.Server.MaxFileSize)
 
 	log.Println("Connecting to database...")
 	log.MustFail(connectToDatabase())
 
 	handleTasks()
 
-	app := fiber.New(fiber.Config{
-		BodyLimit: int(config.MaxFileSize()),
+	r := chi.NewRouter()
+
+	r.Use(middleware.Recoverer)
+	r.Use(log.Middleware())
+
+	r.Group(func(gr chi.Router) {
+		gr.Use(authenticate)
+
+		gr.Post("/upload", uploadHandler)
+		gr.Get("/echos/{page}", listEchosHandler)
+		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 
-	app.Use(recover.New())
-	app.Use(log.Middleware())
-	app.Use(authenticate)
+	r.Get("/favicon.ico", viewEchoHandler)
+	r.Get("/{hash}.{ext}", viewEchoHandler)
 
-	app.Post("/upload", uploadHandler)
-	app.Get("/echos", listEchosHandler)
-	app.Delete("/echos/:hash", deleteEchoHandler)
+	addr := config.Addr()
 
-	log.Printf("Starting server at %s...\n", config.Addr())
-	log.MustFail(app.Listen(config.Addr()))
+	log.Printf("Listening at %s\n", addr)
+	http.ListenAndServe(addr, r)
 }
