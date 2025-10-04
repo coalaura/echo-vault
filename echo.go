@@ -38,11 +38,11 @@ func (e *Echo) Storage() string {
 }
 
 func (e *Echo) URL() string {
-	if !strings.HasSuffix(config.BaseURL, "/") {
-		config.BaseURL += "/"
+	if !strings.HasSuffix(config.Server.URL, "/") {
+		config.Server.URL += "/"
 	}
 
-	return fmt.Sprintf("%s%s.%s", config.BaseURL, e.Hash, e.Extension)
+	return fmt.Sprintf("%s%s.%s", config.Server.URL, e.Hash, e.Extension)
 }
 
 func (e *Echo) Exists() bool {

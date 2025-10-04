@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,13 +34,9 @@ func scanStorage() error {
 		return err
 	}
 
-	err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	err = filepath.WalkDir(path, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
 			return err
-		}
-
-		if info.IsDir() {
-			return nil
 		}
 
 		ext := filepath.Ext(path)
@@ -50,6 +47,11 @@ func scanStorage() error {
 			// Same shit, different day
 			if ext == ".jpeg" {
 				ext = ".jpg"
+			}
+
+			info, err := entry.Info()
+			if err != nil {
+				return err
 			}
 
 			echos = append(echos, Echo{
@@ -63,6 +65,7 @@ func scanStorage() error {
 
 		return nil
 	})
+
 	if err != nil {
 		return err
 	}
@@ -70,9 +73,8 @@ func scanStorage() error {
 	log.Printf("Checking %d echos...\n", len(echos))
 
 	var (
-		newEchos []Echo
-
-		convertedToWebP = 0
+		newEchos  []Echo
+		converted int
 	)
 
 	for index, echo := range echos {
@@ -83,20 +85,22 @@ func scanStorage() error {
 			return err
 		}
 
-		if echo.Extension == "jpg" || echo.Extension == "png" {
-			err = convertEchoToWebP(&echo)
+		if echo.Extension == "jpg" || echo.Extension == "png" || echo.Extension == "gif" {
+			ok, err := convertEchoToWebP(&echo)
 			if err != nil {
 				return err
 			}
 
-			if exists {
-				err = database.SetExtension(echo.Hash, "webp")
-				if err != nil {
-					return err
+			if ok {
+				if exists {
+					err = database.SetExtension(echo.Hash, "webp")
+					if err != nil {
+						return err
+					}
 				}
-			}
 
-			convertedToWebP++
+				converted++
+			}
 		}
 
 		if !exists {
@@ -104,8 +108,8 @@ func scanStorage() error {
 		}
 	}
 
-	if convertedToWebP > 0 {
-		log.Printf("Converted %d echos to webp.\n", convertedToWebP)
+	if converted > 0 {
+		log.Printf("Converted %d echos to webp.\n", converted)
 	}
 
 	if len(newEchos) == 0 {

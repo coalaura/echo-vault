@@ -1,10 +1,15 @@
 package main
 
-import "math/rand"
+import (
+	"math/rand"
+	"regexp"
+)
+
+var hashRgx = regexp.MustCompile(`^[0-9A-Z]{10}$`)
 
 func (d *EchoDatabase) Hash() (string, error) {
 	for {
-		hash := generateHash(10)
+		hash := generateHash()
 
 		echo, err := d.Find(hash)
 		if err != nil {
@@ -17,10 +22,10 @@ func (d *EchoDatabase) Hash() (string, error) {
 	}
 }
 
-func generateHash(len int) string {
+func generateHash() string {
 	var hash string
 
-	for i := 0; i < len; i++ {
+	for i := 0; i < 10; i++ {
 		char := rand.Intn(36) + 48
 
 		if char > 57 {
@@ -31,4 +36,12 @@ func generateHash(len int) string {
 	}
 
 	return hash
+}
+
+func validateHash(hash string) bool {
+	if len(hash) != 10 {
+		return false
+	}
+
+	return hashRgx.MatchString(hash)
 }
