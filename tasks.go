@@ -51,7 +51,7 @@ func scanStorage() error {
 			ext = "jpeg"
 		}
 
-		if config.IsValidImageFormat(ext) || config.IsValidVideoFormat(ext) {
+		if config.IsValidImageFormat(ext) || config.IsValidVideoFormat(ext, false) {
 			hash := strings.TrimSuffix(filepath.Base(path), "."+ext)
 
 			info, err := entry.Info()

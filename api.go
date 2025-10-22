@@ -22,7 +22,7 @@ func viewEchoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ext := chi.URLParam(r, "ext")
-	if !config.IsValidImageFormat(ext) && !config.IsValidVideoFormat(ext) {
+	if !config.IsValidImageFormat(ext) && !config.IsValidVideoFormat(ext, false) {
 		abort(w, http.StatusBadRequest)
 
 		log.Warnln("view: invalid extension")
