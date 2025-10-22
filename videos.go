@@ -12,7 +12,7 @@ func runFFMpeg(ctx context.Context, in, out string, args []string) (int64, error
 	args = append([]string{"-hide_banner", "-loglevel", "error", "-y", "-i", in}, args...)
 	args = append(args, out)
 
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd := exec.CommandContext(ctx, config.ffmpeg, args...)
 
 	var stderr bytes.Buffer
 
