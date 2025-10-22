@@ -19,6 +19,7 @@ func saveGIFAsGIF(ctx context.Context, input, path string) (int64, error) {
 
 	// palettegen/paletteuse at target fps for quality while resizing frame rate
 	args := []string{
+		"-map", "0:v:0",
 		"-an", "-sn",
 		"-filter_complex", buildGifFilter(fps > 0 && fps > float64(config.GIFs.MaxFramerate)),
 		"-f", "gif",
@@ -46,6 +47,7 @@ func saveVideoAsGIF(ctx context.Context, input, path string) (int64, error) {
 	}
 
 	args := []string{
+		"-map", "0:v:0",
 		"-an", "-sn",
 		"-filter_complex", buildGifFilter(fps > 0 && fps > float64(config.GIFs.MaxFramerate)),
 		"-f", "gif",
