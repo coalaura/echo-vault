@@ -85,7 +85,7 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 	case "gif":
 		e.Extension = "gif"
 
-		// return saveGIFAsGIF(file, e.Storage())
+		return saveGIFAsGIF(ctx, path, e.Storage())
 	case "mp4", "webm", "mov", "m4v", "mkv":
 		e.Extension = config.Videos.Format
 
@@ -101,7 +101,7 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 		case "mkv":
 			return saveVideoAsMKV(ctx, path, e.Storage())
 		case "gif":
-			// return saveVideoAsGIF(file, e.Storage())
+			return saveVideoAsGIF(ctx, path, e.Storage())
 		}
 	}
 
