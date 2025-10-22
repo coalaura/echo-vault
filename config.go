@@ -37,6 +37,9 @@ type EchoConfigGIFs struct {
 }
 
 type EchoConfig struct {
+	ffmpeg   string
+	gifsicle string
+
 	Server EchoConfigServer `yaml:"server"`
 	Images EchoConfigImages `yaml:"images"`
 	Videos EchoConfigVideos `yaml:"videos"`
@@ -149,18 +152,26 @@ func (c *EchoConfig) Validate() error {
 
 	// check ffmpeg dependency
 	if c.Videos.Enabled {
-		_, err := exec.LookPath("ffmpeg")
+		ffmpeg, err := exec.LookPath("ffmpeg")
 		if err != nil {
 			return errors.New("ffmpeg is required for videos.enabled")
 		}
+
+		log.Printf("Using ffmpeg: %s\n", ffmpeg)
+
+		c.ffmpeg = ffmpeg
 	}
 
 	// check gifsicle dependency
 	if c.GIFs.Enabled && c.GIFs.Optimize {
-		_, err := exec.LookPath("gifsicle")
+		gifsicle, err := exec.LookPath("gifsicle")
 		if err != nil {
 			return errors.New("gifsicle is required for gifs.optimize")
 		}
+
+		log.Printf("Using gifsicle: %s\n", gifsicle)
+
+		c.gifsicle = gifsicle
 	}
 
 	return nil
