@@ -123,7 +123,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 	defer os.Remove(path)
 
-	_, err = file.Write(sniff.Bytes())
+	n1, err := file.Write(sniff.Bytes())
 	if err != nil {
 		abort(w, http.StatusInternalServerError)
 
@@ -133,7 +133,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = io.Copy(file, part)
+	n2, err := io.Copy(file, part)
 	if err != nil {
 		abort(w, http.StatusInternalServerError)
 
@@ -145,7 +145,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	file.Close()
 
-	echo.UploadSize = file.N
+	echo.UploadSize = int64(n1) + n2
 
 	timer.Stop("read").Start("write")
 
@@ -179,9 +179,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	okay(w, "application/json")
 
-	log.Println(echo.UploadSize)
-	log.Println(size)
-
 	json.NewEncoder(w).Encode(map[string]any{
 		"hash":      echo.Hash,
 		"sniffed":   sniffed,
@@ -194,6 +191,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func byteCountSI(b int64) string {
+	if b < 0 {
+		b = -b
+	}
+
 	if b < 1000 {
 		return fmt.Sprintf("%d B", b)
 	}
