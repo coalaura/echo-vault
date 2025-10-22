@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -29,6 +31,7 @@ type EchoConfigVideos struct {
 }
 
 type EchoConfigGIFs struct {
+	Enabled   bool `yaml:"enabled"`
 	Optimize  bool `yaml:"optimize"`
 	Framerate int  `yaml:"framerate"`
 }
@@ -60,7 +63,8 @@ func NewDefaultConfig() EchoConfig {
 			Optimize: true,
 		},
 		GIFs: EchoConfigGIFs{
-			Optimize:  true,
+			Enabled:   true,
+			Optimize:  false,
 			Framerate: 15,
 		},
 	}
@@ -134,13 +138,29 @@ func (c *EchoConfig) Validate() error {
 	}
 
 	// videos
-	if !c.IsValidVideoFormat(c.Videos.Format) {
+	if !c.IsValidVideoFormat(c.Videos.Format, false) {
 		return fmt.Errorf("videos.format must be one of (mp4, webm, mov, m4v, mkv, gif), got %q", c.Videos.Format)
 	}
 
 	// gifs
 	if c.GIFs.Framerate < 1 || c.GIFs.Framerate > 30 {
 		return fmt.Errorf("gifs.framerate must be 1-30, got %d", c.GIFs.Framerate)
+	}
+
+	// check ffmpeg dependency
+	if c.Videos.Enabled {
+		_, err := exec.LookPath("ffmpeg")
+		if err != nil {
+			return errors.New("ffmpeg is required for videos.enabled")
+		}
+	}
+
+	// check gifsicle dependency
+	if c.GIFs.Enabled && c.GIFs.Optimize {
+		_, err := exec.LookPath("gifsicle")
+		if err != nil {
+			return errors.New("gifsicle is required for gifs.optimize")
+		}
 	}
 
 	return nil
@@ -170,9 +190,10 @@ func (e *EchoConfig) Store() error {
 
 		"$.videos.enabled":  {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg; default: %v)", def.Videos.Enabled))},
 		"$.videos.format":   {yaml.HeadComment(fmt.Sprintf(" target format for videos (mp4, webm, mov, m4v, mkv or gif; default: %v)", def.Videos.Format))},
-		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (removes metadata, compresses and re-encodes; default: %v)", def.Videos.Optimize))},
+		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (compresses and re-encodes; default: %v)", def.Videos.Optimize))},
 
-		"$.gifs.optimize":  {yaml.HeadComment(fmt.Sprintf(" optimize gifs (removes metadata, compresses and re-encodes; default: %v)", def.GIFs.Optimize))},
+		"$.gifs.enabled":   {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (default: %v)", def.GIFs.Enabled))},
+		"$.gifs.optimize":  {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; requires gifsicle; default: %v)", def.GIFs.Optimize))},
 		"$.gifs.framerate": {yaml.HeadComment(fmt.Sprintf(" gif target fps (1 - 30; default: %v)", def.GIFs.Framerate))},
 	}
 
@@ -195,9 +216,17 @@ func (e *EchoConfig) IsValidImageFormat(format string) bool {
 	return false
 }
 
-func (e *EchoConfig) IsValidVideoFormat(format string) bool {
+func (e *EchoConfig) IsValidVideoFormat(format string, checkEnabled bool) bool {
+	if format == "gif" {
+		return !checkEnabled || e.GIFs.Enabled
+	}
+
+	if checkEnabled && !e.Videos.Enabled {
+		return false
+	}
+
 	switch format {
-	case "mp4", "webm", "mov", "m4v", "mkv", "gif":
+	case "mp4", "webm", "mov", "m4v", "mkv":
 		return true
 	}
 

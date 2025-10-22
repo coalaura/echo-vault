@@ -94,10 +94,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	sniffed := sniffType(sniff.Bytes())
 
-	if sniffed == "" || (!config.IsValidImageFormat(sniffed) && !config.IsValidVideoFormat(sniffed)) {
+	if sniffed == "" || (!config.IsValidImageFormat(sniffed) && !config.IsValidVideoFormat(sniffed, true)) {
 		abort(w, http.StatusBadRequest)
 
-		log.Warnln("upload: file type not recognized")
+		log.Warnln("upload: invalid/unrecognized filetype")
 
 		return
 	}
