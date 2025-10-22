@@ -31,12 +31,13 @@ type EchoConfigVideos struct {
 }
 
 type EchoConfigGIFs struct {
-	Enabled   bool `yaml:"enabled"`
-	Optimize  bool `yaml:"optimize"`
-	Effort    int  `yaml:"effort"`
-	Quality   int  `yaml:"quality"`
-	Colors    int  `yaml:"colors"`
-	Framerate int  `yaml:"framerate"`
+	Enabled      bool `yaml:"enabled"`
+	Optimize     bool `yaml:"optimize"`
+	Effort       int  `yaml:"effort"`
+	Quality      int  `yaml:"quality"`
+	MaxColors    int  `yaml:"max_colors"`
+	MaxFramerate int  `yaml:"max_framerate"`
+	MaxWidth     int  `yaml:"max_width"`
 }
 
 type EchoConfig struct {
@@ -70,12 +71,13 @@ func NewDefaultConfig() EchoConfig {
 			Optimize: true,
 		},
 		GIFs: EchoConfigGIFs{
-			Enabled:   false,
-			Optimize:  true,
-			Effort:    2,
-			Quality:   90,
-			Colors:    256,
-			Framerate: 15,
+			Enabled:      false,
+			Optimize:     true,
+			Effort:       2,
+			Quality:      90,
+			MaxColors:    256,
+			MaxFramerate: 15,
+			MaxWidth:     480,
 		},
 	}
 }
@@ -156,8 +158,16 @@ func (c *EchoConfig) Validate() error {
 		return fmt.Errorf("gifs.quality must be 1-100, got %d", c.GIFs.Quality)
 	}
 
-	if c.GIFs.Colors < 2 || c.GIFs.Colors > 256 {
-		return fmt.Errorf("gifs.colors must be 2-256, got %d", c.GIFs.Colors)
+	if c.GIFs.MaxColors < 2 || c.GIFs.MaxColors > 256 {
+		return fmt.Errorf("gifs.max_colors must be 2-256, got %d", c.GIFs.MaxColors)
+	}
+
+	if c.GIFs.MaxFramerate < 1 || c.GIFs.MaxFramerate > 30 {
+		return fmt.Errorf("gifs.max_framerate must be 1-30, got %d", c.GIFs.MaxFramerate)
+	}
+
+	if c.GIFs.MaxWidth < 1 || c.GIFs.MaxWidth > 1024 {
+		return fmt.Errorf("gifs.max_width must be 1-1024, got %d", c.GIFs.MaxWidth)
 	}
 
 	// check ffmpeg dependency
@@ -218,12 +228,13 @@ func (e *EchoConfig) Store() error {
 		"$.videos.format":   {yaml.HeadComment(fmt.Sprintf(" target format for videos (mp4, webm, mov, m4v, mkv or gif; default: %v)", def.Videos.Format))},
 		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (compresses and re-encodes; default: %v)", def.Videos.Optimize))},
 
-		"$.gifs.enabled":   {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
-		"$.gifs.optimize":  {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: %v)", def.GIFs.Optimize))},
-		"$.gifs.effort":    {yaml.HeadComment(fmt.Sprintf(" gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.GIFs.Effort))},
-		"$.gifs.quality":   {yaml.HeadComment(fmt.Sprintf(" gif visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: %v)", def.GIFs.Quality))},
-		"$.gifs.colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.Colors))},
-		"$.gifs.framerate": {yaml.HeadComment(fmt.Sprintf(" gif target fps (1 - 30; default: %v)", def.GIFs.Framerate))},
+		"$.gifs.enabled":       {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
+		"$.gifs.optimize":      {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: %v)", def.GIFs.Optimize))},
+		"$.gifs.effort":        {yaml.HeadComment(fmt.Sprintf(" gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.GIFs.Effort))},
+		"$.gifs.quality":       {yaml.HeadComment(fmt.Sprintf(" visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: %v)", def.GIFs.Quality))},
+		"$.gifs.max_colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.MaxColors))},
+		"$.gifs.max_framerate": {yaml.HeadComment(fmt.Sprintf(" maximum fps (1 - 30; default: %v)", def.GIFs.MaxFramerate))},
+		"$.gifs.max_width":     {yaml.HeadComment(fmt.Sprintf(" maximum width/height (1 - 1024; default: %v)", def.GIFs.MaxWidth))},
 	}
 
 	file, err := OpenFileForWriting("config.yml")

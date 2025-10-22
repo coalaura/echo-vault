@@ -11,6 +11,10 @@ import (
 	"strings"
 )
 
+func ffmpegScaleExpression(maxWidth int) string {
+	return fmt.Sprintf("scale='if(gt(iw,ih),%d,-2)':'if(gt(iw,ih),-2,%d)':flags=lanczos", maxWidth, maxWidth)
+}
+
 func parseFPSRational(line string) (float64, bool) {
 	if index := strings.Index(line, "/"); index != -1 {
 		num, err1 := strconv.ParseFloat(line[:index], 64)
