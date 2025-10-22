@@ -39,15 +39,20 @@ func scanStorage() error {
 			return err
 		}
 
-		ext := filepath.Ext(path)
+		ext := strings.ToLower(filepath.Ext(path))
 
-		if ext == ".webp" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" {
-			hash := strings.TrimSuffix(filepath.Base(path), ext)
+		if len(ext) < 2 {
+			return nil
+		}
 
-			// Same shit, different day
-			if ext == ".jpeg" {
-				ext = ".jpg"
-			}
+		ext = ext[1:]
+
+		if ext == "jpg" {
+			ext = "jpeg"
+		}
+
+		if config.IsValidImageFormat(ext) || config.IsValidVideoFormat(ext) {
+			hash := strings.TrimSuffix(filepath.Base(path), "."+ext)
 
 			info, err := entry.Info()
 			if err != nil {
@@ -58,7 +63,7 @@ func scanStorage() error {
 				Hash:       hash,
 				Name:       info.Name(),
 				UploadSize: info.Size(),
-				Extension:  ext[1:],
+				Extension:  ext,
 				Timestamp:  info.ModTime().Unix(),
 			})
 		}
@@ -72,10 +77,7 @@ func scanStorage() error {
 
 	log.Printf("Checking %d echos...\n", len(echos))
 
-	var (
-		newEchos  []Echo
-		converted int
-	)
+	var create []Echo
 
 	for index, echo := range echos {
 		log.Printf("%d of %d\r", index+1, len(echos))
@@ -85,43 +87,23 @@ func scanStorage() error {
 			return err
 		}
 
-		if echo.Extension == "jpg" || echo.Extension == "png" || echo.Extension == "gif" {
-			ok, err := convertEchoToWebP(&echo)
-			if err != nil {
-				return err
-			}
-
-			if ok {
-				if exists {
-					err = database.SetExtension(echo.Hash, "webp")
-					if err != nil {
-						return err
-					}
-				}
-
-				converted++
-			}
+		if exists {
+			continue
 		}
 
-		if !exists {
-			newEchos = append(newEchos, echo)
-		}
+		create = append(create, echo)
 	}
 
-	if converted > 0 {
-		log.Printf("Converted %d echos to webp.\n", converted)
-	}
-
-	if len(newEchos) == 0 {
+	if len(create) == 0 {
 		log.Println("No new echos found.")
 
 		return nil
 	}
 
-	log.Printf("Creating %d new echos...\n", len(newEchos))
+	log.Printf("Creating %d new echos...\n", len(create))
 
-	for i, echo := range newEchos {
-		log.Printf("[%d/%d] Creating echo %s...\n", i+1, len(newEchos), echo.Hash)
+	for i, echo := range create {
+		log.Printf("[%d/%d] Creating echo %s...\n", i+1, len(create), echo.Hash)
 
 		err = database.Create(&echo)
 		if err != nil {

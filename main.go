@@ -13,7 +13,7 @@ import (
 var Version = "dev"
 
 var (
-	config   EchoConfig
+	config   *EchoConfig
 	database *EchoDatabase
 
 	//go:embed favicon.ico
@@ -25,15 +25,18 @@ var (
 func main() {
 	log.Printf("Echo-Vault %s\n", Version)
 
-	os.MkdirAll("./storage", 0755)
+	err := os.MkdirAll("./storage", 0755)
+	log.MustFail(err)
 
-	log.Println("Loading env...")
-	log.MustFail(loadConfig())
+	log.Println("Loading config...")
 
-	log.Printf("Using max file size: %dMB\n", config.Server.MaxFileSize)
+	config, err = LoadConfig()
+	log.MustFail(err)
 
 	log.Println("Connecting to database...")
-	log.MustFail(connectToDatabase())
+
+	database, err = ConnectToDatabase()
+	log.MustFail(err)
 
 	handleTasks()
 
@@ -51,7 +54,8 @@ func main() {
 	})
 
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		okay(w)
+
 		w.Write(favicon)
 	})
 
