@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
+	"strconv"
 )
 
 func saveGIFAsGIF(ctx context.Context, input, path string) (int64, error) {
@@ -33,17 +35,10 @@ func saveGIFAsGIF(ctx context.Context, input, path string) (int64, error) {
 			return 0, err
 		}
 	} else {
-		err = os.Rename(input, path)
+		size, err = CopyFile(input, path)
 		if err != nil {
 			return 0, err
 		}
-
-		stat, err := os.Stat(path)
-		if err != nil {
-			return 0, err
-		}
-
-		size = stat.Size()
 	}
 
 	if config.GIFs.Optimize {
@@ -95,12 +90,7 @@ func saveVideoAsGIF(ctx context.Context, input, path string) (int64, error) {
 }
 
 func optimizeGIF(ctx context.Context, path string) (int64, error) {
-	args := []string{
-		fmt.Sprintf("-O%d", config.GIFs.Effort),
-		"--no-comments", "--no-names", "--no-extensions",
-		"-o", path,
-		path,
-	}
+	args := gifsicleArgs(path)
 
 	cmd := exec.CommandContext(ctx, config.gifsicle, args...)
 
@@ -124,4 +114,26 @@ func optimizeGIF(ctx context.Context, path string) (int64, error) {
 	}
 
 	return stat.Size(), nil
+}
+
+func gifsicleArgs(path string) []string {
+	args := []string{
+		fmt.Sprintf("-O%d", config.GIFs.Effort),
+		"--no-comments", "--no-names", "--no-extensions",
+		"--colors", strconv.Itoa(config.GIFs.Colors),
+	}
+
+	if config.GIFs.Quality < 100 {
+		lossy := int(math.Round(float64(100-config.GIFs.Quality) * 1.4))
+
+		if lossy > 0 {
+			args = append(args, fmt.Sprintf("--lossy=%d", lossy))
+		}
+	}
+
+	return append(
+		args,
+		"-o", path,
+		path,
+	)
 }

@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"sync/atomic"
 )
 
@@ -176,12 +179,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	okay(w, "application/json")
 
+	log.Println(echo.UploadSize)
+	log.Println(size)
+
 	json.NewEncoder(w).Encode(map[string]any{
 		"hash":      echo.Hash,
 		"sniffed":   sniffed,
 		"extension": echo.Extension,
 		"url":       echo.URL(),
 		"size":      byteCountSI(size),
+		"change":    formatSizeChange(echo.UploadSize, size),
 		"timing":    timer,
 	})
 }
@@ -199,4 +206,43 @@ func byteCountSI(b int64) string {
 	}
 
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "kMGTPE"[exp])
+}
+
+func formatSizeChange(input, output int64) string {
+	if input == output {
+		return "same"
+	}
+
+	if input == 0 || output == 0 {
+		return "N/A"
+	}
+
+	ratio := float64(output) / float64(input)
+	change := ratio - 1
+
+	delta := byteCountSI(output - input)
+
+	if change < 0 {
+		return fmt.Sprintf("saved %s (-%s)", formatPercent(change), delta)
+	} else if change*100 >= 1000 {
+		return fmt.Sprintf("%sx larger (+%s)", formatFactor(ratio), strings.TrimPrefix(delta, "-"))
+	}
+
+	return fmt.Sprintf("grew %s (+%s)", formatPercent(change), strings.TrimPrefix(delta, "-"))
+}
+
+func formatPercent(frac float64) string {
+	str := strconv.FormatFloat(math.Abs(frac*100), 'f', 2, 64)
+	str = strings.TrimRight(str, "0")
+	str = strings.TrimRight(str, ".")
+
+	return str + "%"
+}
+
+func formatFactor(ratio float64) string {
+	str := strconv.FormatFloat(ratio, 'f', 2, 64)
+	str = strings.TrimRight(str, "0")
+	str = strings.TrimRight(str, ".")
+
+	return str
 }
