@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 )
 
 func saveGIFAsGIF(ctx context.Context, input, path string) (int64, error) {
@@ -16,29 +17,16 @@ func saveGIFAsGIF(ctx context.Context, input, path string) (int64, error) {
 		log.Warnf("failed to probe fps: %v\n", err)
 	}
 
-	var size int64
+	// palettegen/paletteuse at target fps for quality while resizing frame rate
+	args := []string{
+		"-an", "-sn",
+		"-filter_complex", buildGifFilter(fps > 0 && fps > float64(config.GIFs.MaxFramerate)),
+		"-f", "gif",
+	}
 
-	if fps > 0 && fps > float64(config.GIFs.Framerate) {
-		// palettegen/paletteuse at target fps for quality while resizing frame rate
-		args := []string{
-			"-an", "-sn",
-			"-filter_complex",
-			fmt.Sprintf(
-				"[0:v]fps=%d,split[s0][s1];[s0]palettegen=stats_mode=full:max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
-				config.GIFs.Framerate,
-			),
-			"-f", "gif",
-		}
-
-		size, err = runFFMpeg(ctx, input, path, args)
-		if err != nil {
-			return 0, err
-		}
-	} else {
-		size, err = CopyFile(input, path)
-		if err != nil {
-			return 0, err
-		}
+	size, err := runFFMpeg(ctx, input, path, args)
+	if err != nil {
+		return 0, err
 	}
 
 	if config.GIFs.Optimize {
@@ -57,20 +45,9 @@ func saveVideoAsGIF(ctx context.Context, input, path string) (int64, error) {
 		log.Warnf("failed to probe fps: %v\n", err)
 	}
 
-	var filter string
-
-	if fps > 0 && fps > float64(config.GIFs.Framerate) {
-		filter = fmt.Sprintf(
-			"[0:v]fps=%d,split[s0][s1];[s0]palettegen=stats_mode=full:max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
-			config.GIFs.Framerate,
-		)
-	} else {
-		filter = "[0:v]split[s0][s1];[s0]palettegen=stats_mode=full:max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
-	}
-
 	args := []string{
 		"-an", "-sn",
-		"-filter_complex", filter,
+		"-filter_complex", buildGifFilter(fps > 0 && fps > float64(config.GIFs.MaxFramerate)),
 		"-f", "gif",
 	}
 
@@ -116,11 +93,31 @@ func optimizeGIF(ctx context.Context, path string) (int64, error) {
 	return stat.Size(), nil
 }
 
+func buildGifFilter(resampleFPS bool) string {
+	var chain strings.Builder
+
+	if resampleFPS {
+		chain.WriteString(fmt.Sprintf("fps=%d", config.GIFs.MaxFramerate))
+	}
+
+	if chain.Len() > 0 {
+		chain.WriteByte(',')
+	}
+
+	chain.WriteString(ffmpegScaleExpression(config.GIFs.MaxWidth))
+
+	return fmt.Sprintf(
+		"[0:v]%s,split[s0][s1];[s0]palettegen=stats_mode=full:max_colors=%d[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+		chain.String(),
+		config.GIFs.MaxColors,
+	)
+}
+
 func gifsicleArgs(path string) []string {
 	args := []string{
 		fmt.Sprintf("-O%d", config.GIFs.Effort),
 		"--no-comments", "--no-names", "--no-extensions",
-		"--colors", strconv.Itoa(config.GIFs.Colors),
+		"--colors", strconv.Itoa(config.GIFs.MaxColors),
 	}
 
 	if config.GIFs.Quality < 100 {
