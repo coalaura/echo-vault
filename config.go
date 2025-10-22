@@ -34,6 +34,8 @@ type EchoConfigGIFs struct {
 	Enabled   bool `yaml:"enabled"`
 	Optimize  bool `yaml:"optimize"`
 	Effort    int  `yaml:"effort"`
+	Quality   int  `yaml:"quality"`
+	Colors    int  `yaml:"colors"`
 	Framerate int  `yaml:"framerate"`
 }
 
@@ -71,6 +73,8 @@ func NewDefaultConfig() EchoConfig {
 			Enabled:   false,
 			Optimize:  true,
 			Effort:    2,
+			Quality:   90,
+			Colors:    256,
 			Framerate: 15,
 		},
 	}
@@ -91,11 +95,6 @@ func LoadConfig() (*EchoConfig, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		err = cfg.Store()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	err = cfg.Validate()
@@ -103,7 +102,7 @@ func LoadConfig() (*EchoConfig, error) {
 		return nil, err
 	}
 
-	return &cfg, nil
+	return &cfg, cfg.Store()
 }
 
 func (c *EchoConfig) Validate() error {
@@ -153,8 +152,12 @@ func (c *EchoConfig) Validate() error {
 		return fmt.Errorf("gifs.effort must be 1-3, got %d", c.GIFs.Effort)
 	}
 
-	if c.GIFs.Framerate < 1 || c.GIFs.Framerate > 30 {
-		return fmt.Errorf("gifs.framerate must be 1-30, got %d", c.GIFs.Framerate)
+	if c.GIFs.Quality < 1 || c.GIFs.Quality > 100 {
+		return fmt.Errorf("gifs.quality must be 1-100, got %d", c.GIFs.Quality)
+	}
+
+	if c.GIFs.Colors < 2 || c.GIFs.Colors > 256 {
+		return fmt.Errorf("gifs.colors must be 2-256, got %d", c.GIFs.Colors)
 	}
 
 	// check ffmpeg dependency
@@ -218,6 +221,8 @@ func (e *EchoConfig) Store() error {
 		"$.gifs.enabled":   {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
 		"$.gifs.optimize":  {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: %v)", def.GIFs.Optimize))},
 		"$.gifs.effort":    {yaml.HeadComment(fmt.Sprintf(" gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.GIFs.Effort))},
+		"$.gifs.quality":   {yaml.HeadComment(fmt.Sprintf(" gif visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: %v)", def.GIFs.Quality))},
+		"$.gifs.colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.Colors))},
 		"$.gifs.framerate": {yaml.HeadComment(fmt.Sprintf(" gif target fps (1 - 30; default: %v)", def.GIFs.Framerate))},
 	}
 
