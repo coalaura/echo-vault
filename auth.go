@@ -8,7 +8,7 @@ import (
 func authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !isAuthenticated(r) {
-			w.WriteHeader(http.StatusUnauthorized)
+			abort(w, http.StatusUnauthorized)
 
 			return
 		}

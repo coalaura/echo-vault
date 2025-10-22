@@ -10,17 +10,17 @@ type EchoDatabase struct {
 	*sql.DB
 }
 
-func connectToDatabase() error {
+func ConnectToDatabase() (*EchoDatabase, error) {
 	db, err := sql.Open("sqlite", "./echo.db")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	b := NewTableBuilder(db, "echos")
 
 	err = b.Create()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = b.AddColumns([]SQLiteColumn{
@@ -31,12 +31,10 @@ func connectToDatabase() error {
 		{"timestamp", "INTEGER NOT NULL"},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	database = &EchoDatabase{db}
-
-	return nil
+	return &EchoDatabase{db}, nil
 }
 
 func (d *EchoDatabase) Exists(hash string) (bool, error) {

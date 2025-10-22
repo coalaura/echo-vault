@@ -140,4 +140,4 @@ Echo-Vault doubles as a tiny maintenance tool when invoked with commands:
 
 ### `echo-vault scan`
 
-Walks the `storage/` directory, imports missing files into the database, and converts PNG/JPG/GIF files to WebP/GIF (respecting `re_encode_gif`). Progress is logged to stdout.
+Walks the `storage/` directory and imports missing files into the database. Progress is logged to stdout.

@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -38,10 +38,6 @@ func (e *Echo) Storage() string {
 }
 
 func (e *Echo) URL() string {
-	if !strings.HasSuffix(config.Server.URL, "/") {
-		config.Server.URL += "/"
-	}
-
 	return fmt.Sprintf("%s%s.%s", config.Server.URL, e.Hash, e.Extension)
 }
 
@@ -59,4 +55,55 @@ func (e *Echo) Unlink() error {
 	}
 
 	return os.Remove(file)
+}
+
+func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error) {
+	err := e.Fill()
+	if err != nil {
+		return 0, err
+	}
+
+	switch e.Extension {
+	case "jpg", "jpeg", "png", "webp":
+		file, err := OpenFileForReading(path)
+		if err != nil {
+			return 0, err
+		}
+
+		defer file.Close()
+
+		e.Extension = config.Images.Format
+
+		switch e.Extension {
+		case "webp":
+			return saveImageAsWebP(file, e.Storage())
+		case "png":
+			return saveImageAsPNG(file, e.Storage())
+		case "jpeg":
+			return saveImageAsJPEG(file, e.Storage())
+		}
+	case "gif":
+		e.Extension = "gif"
+
+		// return saveGIFAsGIF(file, e.Storage())
+	case "mp4", "webm", "mov", "m4v", "mkv":
+		e.Extension = config.Videos.Format
+
+		switch e.Extension {
+		case "mp4":
+			return saveVideoAsMP4(ctx, path, e.Storage())
+		case "webm":
+			return saveVideoAsWebM(ctx, path, e.Storage())
+		case "mov":
+			return saveVideoAsMOV(ctx, path, e.Storage())
+		case "m4v":
+			return saveVideoAsM4V(ctx, path, e.Storage())
+		case "mkv":
+			return saveVideoAsMKV(ctx, path, e.Storage())
+		case "gif":
+			// return saveVideoAsGIF(file, e.Storage())
+		}
+	}
+
+	return 0, fmt.Errorf("unsupported extension %q", e.Extension)
 }
