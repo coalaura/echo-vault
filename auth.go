@@ -18,10 +18,6 @@ func authenticate(next http.Handler) http.Handler {
 }
 
 func isAuthenticated(r *http.Request) bool {
-	if config.Server.UploadToken == "" {
-		return true
-	}
-
 	token := r.Header.Get("Authorization")
 
 	if !strings.HasPrefix(token, "Bearer ") {
