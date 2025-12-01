@@ -1,29 +1,25 @@
 [Unit]
-Description=Echo Vault (/var/images.shrt.day)
+Description=Echo Vault (/var/echo-vault)
 After=network-online.target
 StartLimitBurst=10
 StartLimitIntervalSec=60
 
 [Service]
 Type=simple
-User=echo_vault
-Group=echo_vault
+User=echo-vault
+Group=echo-vault
 
-WorkingDirectory=/var/images.shrt.day
-ExecStart=/var/images.shrt.day/echo_vault
+WorkingDirectory=/var/echo-vault
+ExecStart=/var/echo-vault/echo-vault
 
-StandardOutput=append:/var/images.shrt.day/echo_vault.log
-StandardError=append:/var/images.shrt.day/echo_vault.log
-
-# Memory Protection
-MemoryDenyWriteExecute=yes
+StandardOutput=append:/var/echo-vault/echo-vault.log
+StandardError=append:/var/echo-vault/echo-vault.log
 
 # Filesystem Sandboxing
 ProtectSystem=strict
-ReadWritePaths=/var/images.shrt.day
+ReadWritePaths=/var/echo-vault
 ProtectHome=yes
 PrivateTmp=yes
-PrivateDevices=yes
 UMask=0022
 RestrictSUIDSGID=true
 
@@ -47,7 +43,7 @@ RestrictRealtime=yes
 
 # Capabilities & Syscalls
 CapabilityBoundingSet=
-SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @reboot @swap @resources @raw-io @privileged
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @reboot @swap @raw-io @privileged
 
 # Network Restriction
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
