@@ -1,0 +1,60 @@
+[Unit]
+Description=Echo Vault (/var/images.shrt.day)
+After=network-online.target
+StartLimitBurst=10
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+User=echo_vault
+Group=echo_vault
+
+WorkingDirectory=/var/images.shrt.day
+ExecStart=/var/images.shrt.day/echo_vault
+
+StandardOutput=append:/var/images.shrt.day/echo_vault.log
+StandardError=append:/var/images.shrt.day/echo_vault.log
+
+# Memory Protection
+MemoryDenyWriteExecute=yes
+
+# Filesystem Sandboxing
+ProtectSystem=strict
+ReadWritePaths=/var/images.shrt.day
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+UMask=0022
+RestrictSUIDSGID=true
+
+# Kernel & Hardware Protection
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+SystemCallArchitectures=native
+
+# Process & Identity Isolation
+ProtectProc=invisible
+ProcSubset=pid
+LockPersonality=yes
+ProtectHostname=yes
+NoNewPrivileges=yes
+RestrictNamespaces=yes
+RemoveIPC=yes
+RestrictRealtime=yes
+
+# Capabilities & Syscalls
+CapabilityBoundingSet=
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @reboot @swap @resources @raw-io @privileged
+
+# Network Restriction
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+Restart=always
+RestartSec=3
+RuntimeMaxSec=5d
+
+[Install]
+WantedBy=multi-user.target
