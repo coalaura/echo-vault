@@ -38,7 +38,7 @@ func (e *Echo) Storage() string {
 }
 
 func (e *Echo) URL() string {
-	return fmt.Sprintf("%s%s.%s", config.Server.URL, e.Hash, e.Extension)
+	return fmt.Sprintf("%s/i/%s.%s", config.Server.URL, e.Hash, e.Extension)
 }
 
 func (e *Echo) Exists() bool {
