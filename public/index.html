@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<title>Echo Vault</title>
+
+		<link rel="icon" href="/favicon-dark.ico" media="(prefers-color-scheme: light)" />
+		<link rel="icon" href="/favicon-light.ico" media="(prefers-color-scheme: dark)" />
+
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<div id="app">
+			<section id="login-view" class="hidden">
+				<div class="login-card">
+					<h2>// ACCESS_CONTROL <span class="version-tag"></span></h2>
+
+					<form id="login-form">
+						<input type="password" id="api-token" placeholder="Enter Access Token" required autocomplete="current-password" />
+						<button type="submit">AUTHENTICATE</button>
+					</form>
+
+					<div id="login-error" class="error hidden">Invalid Token</div>
+				</div>
+			</section>
+
+			<section id="dashboard-view" class="hidden">
+				<header>
+					<div class="brand">ECHO_VAULT <span class="version-tag"></span></div>
+
+					<div class="actions">
+						<input type="file" id="file-input" hidden />
+						<button id="upload-trigger">UPLOAD_FILE</button>
+						<button id="logout-btn">DISCONNECT</button>
+					</div>
+				</header>
+
+				<main id="gallery"></main>
+
+				<div id="empty-state" class="hidden">
+					<div class="void-icon">∅</div>
+					<div>VOID DETECTED // NO_DATA</div>
+				</div>
+
+				<div id="loader" class="hidden">
+					<span class="spinner"></span> SYNCHRONIZING...
+				</div>
+			</section>
+
+			<div id="modal-view" class="hidden">
+				<div class="modal-backdrop"></div>
+				<div class="modal-content"></div>
+			</div>
+
+			<div id="drop-overlay" class="hidden">
+				<div>RELEASE TO UPLOAD</div>
+			</div>
+		</div>
+
+		<script src="/script.js"></script>
+	</body>
+</html>

@@ -21,7 +21,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer limiter.Add(-1)
 
 	if concurrent > int32(config.Server.MaxConcurrency) {
-		abort(w, http.StatusTooManyRequests)
+		abort(w, http.StatusTooManyRequests, "server busy: too many concurrent uploads")
 
 		log.Warnln("upload: too many concurrent uploads")
 
@@ -32,7 +32,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	mr, err := r.MultipartReader()
 	if err != nil {
-		abort(w, http.StatusBadRequest)
+		abort(w, http.StatusBadRequest, "invalid multipart request")
 
 		log.Warnln("upload: not multipart")
 		log.Warnln(err)
@@ -49,7 +49,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			abort(w, http.StatusBadRequest)
+			abort(w, http.StatusBadRequest, "failed to read form data")
 
 			log.Warnln("upload: failed to read part")
 			log.Warnln(err)
@@ -67,7 +67,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if part == nil {
-		abort(w, http.StatusBadRequest)
+		abort(w, http.StatusBadRequest, "missing 'upload' file field")
 
 		log.Warnln("upload: missing 'upload' part")
 
@@ -87,7 +87,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = io.Copy(&sniff, &limited)
 	if err != nil && err != io.EOF {
-		abort(w, http.StatusBadRequest)
+		abort(w, http.StatusBadRequest, "failed to read file stream")
 
 		log.Warnln("upload: failed to read file header")
 		log.Warnln(err)
@@ -98,7 +98,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	sniffed := sniffType(sniff.Bytes())
 
 	if sniffed == "" || (!config.IsValidImageFormat(sniffed) && !config.IsValidVideoFormat(sniffed, true)) {
-		abort(w, http.StatusBadRequest)
+		abort(w, http.StatusBadRequest, "unsupported file type")
 
 		log.Warnln("upload: invalid/unrecognized filetype")
 
@@ -112,7 +112,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	file, path, err := OpenTempFileForWriting()
 	if err != nil {
-		abort(w, http.StatusInternalServerError)
+		abort(w, http.StatusInternalServerError, "internal storage error")
 
 		log.Warnln("upload: failed to open temporary file")
 		log.Warnln(err)
@@ -125,7 +125,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	n1, err := file.Write(sniff.Bytes())
 	if err != nil {
-		abort(w, http.StatusInternalServerError)
+		abort(w, http.StatusInternalServerError, "internal write error")
 
 		log.Warnln("upload: failed to write file header")
 		log.Warnln(err)
@@ -135,7 +135,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	n2, err := io.Copy(file, part)
 	if err != nil {
-		abort(w, http.StatusInternalServerError)
+		abort(w, http.StatusInternalServerError, "internal write error")
 
 		log.Warnln("upload: failed to write file body")
 		log.Warnln(err)
@@ -151,7 +151,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	size, err := echo.SaveUploadedFile(r.Context(), path)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		abort(w, http.StatusInternalServerError, "failed to save to permanent storage")
 
 		log.Warnln("upload: failed to save uploaded file")
 		log.Warnln(err)
@@ -165,7 +165,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = database.Create(echo)
 	if err != nil {
-		abort(w, http.StatusInternalServerError)
+		abort(w, http.StatusInternalServerError, "database error")
 
 		log.Warnln("upload: failed to create echo in database")
 		log.Warnln(err)
