@@ -1,10 +1,11 @@
 ![banner](.github/banner.png)
 
-A blazing fast, minimal ShareX backend written in Go. Echo-Vault features a powerful, configurable media processing pipeline for images, videos, and GIFs. It leverages `ffmpeg` and `gifsicle` to handle transcoding and optimization, keeping the core service lean while giving you full control over your media.
+A blazing fast, minimal ShareX backend written in Go. Echo-Vault features a powerful, configurable media processing pipeline and a built-in, dependency-free dark mode dashboard. It leverages `ffmpeg` and `gifsicle` to handle transcoding and optimization, keeping the core service lean while giving you full control over your media.
 
 ## Features
 
 - Drop-in ShareX uploader with bearer-token auth
+- Minimal, responsive Web UI for gallery viewing and management
 - Configurable image processing to WebP, PNG, or JPEG
 - Video transcoding and optimization (MP4, WebM, etc.) powered by ffmpeg
 - Advanced GIF pipeline: convert from video, resample, downscale, reduce colors, and optimize with gifsicle
@@ -22,7 +23,7 @@ sudo apt install ffmpeg gifsicle
 # Arch Linux
 sudo pacman -S ffmpeg gifsicle
 ```
-3. Run the binary once in the target directory to create `config.yml` and the `storage/` folder.
+3. Run the binary once in the target directory to create `config.yml` and `storage/`.
 4. Edit `config.yml` to enable features and set your domain, port, and upload token.
 5. (Optional) Install the provided [echo_vault.service](echo_vault.service) unit next to the binary.
 6. Make the binary executable: `chmod +x echo_vault`.
@@ -38,91 +39,92 @@ Running Echo-Vault creates a commented `config.yml`. Adjust it and restart the s
 
 ```yaml
 server:
+  # base url of your instance (default: http://localhost:8080/)
   url: http://localhost:8080/
+  # port to run echo-vault on (default: 8080)
   port: 8080
+  # upload token for authentication, leave empty to disable auth (default: p4$$w0rd)
   token: p4$$w0rd
+  # maximum upload file-size in MB (default: 10MB)
   max_file_size: 10
+  # maximum concurrent uploads (default: 4)
   max_concurrency: 4
 
 images:
+  # target format for images (webp, png or jpeg; default: webp)
   format: webp
+  # quality/speed trade-off (1 = fast/big, 2 = medium, 3 = slow/small; default: 2)
   effort: 2
+  # webp quality (0-100, 100 = lossless; default: 90)
   quality: 90
 
 videos:
+  # allow video uploads (requires ffmpeg/ffprobe; default: false)
   enabled: false
+  # target format for videos (mp4, webm, mov, m4v, mkv or gif; default: mp4)
   format: mp4
+  # optimize videos (compresses and re-encodes; default: true)
   optimize: true
 
 gifs:
+  # allow gif uploads (requires ffmpeg/ffprobe; default: false)
   enabled: false
+  # optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: true)
   optimize: true
+  # gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: 2)
   effort: 2
+  # visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: 90)
   quality: 90
+  # maximum colors in GIF palette (2-256; smaller = smaller files; default: 256)
   max_colors: 256
+  # maximum fps (1 - 30; default: 15)
   max_framerate: 15
+  # maximum width/height (1 - 1024; default: 480)
   max_width: 480
 ```
 
-### `server` section
+## API & Nginx
 
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `url` | string | `http://localhost:8080/` | Public base URL used when generating response links. |
-| `port` | int | `8080` | Port Echo-Vault listens on. |
-| `token` | string | `p4$$w0rd` | Bearer token for uploads/management. Leave empty to disable auth. |
-| `max_file_size` | int | `10` | Reject uploads larger than this limit in MB. |
-| `max_concurrency` | int | `4` | Maximum concurrent uploads to process. |
+The application serves the Dashboard at `/`, API endpoints at `/echos` and `/upload`, and raw files at `/i/`.
 
-### `images` section
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `format` | string | `webp` | Target format for images (`webp`, `png`, `jpeg`). |
-| `effort` | int (1-3) | `2` | Speed/quality trade-off (`1`=fast, `3`=slow/small). |
-| `quality` | int (1-100) | `90` | Image quality; `100` is lossless for WebP. |
-
-### `videos` section
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Allow video uploads (requires `ffmpeg`). |
-| `format` | string | `mp4` | Target format (`mp4`, `webm`, `mov`, `mkv`, `gif`). |
-| `optimize` | bool | `true` | Re-encode with smaller, web-friendly settings. `false` preserves quality more closely. |
-
-### `gifs` section
-
-| Key | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Allow GIF uploads (requires `ffmpeg` and `ffprobe`). |
-| `optimize` | bool | `true` | Run final GIFs through `gifsicle` to reduce size (requires `gifsicle`). |
-| `effort` | int (1-3) | `2` | Gifsicle optimization level (`-O<effort>`). |
-| `quality`| int (1-100)| `90` | `100` is lossless. Lower values enable `gifsicle --lossy` for smaller files. |
-| `max_colors`| int (2-256)| `256` | Maximum colors in the GIF palette. |
-| `max_framerate`| int (1-30)| `15` | Resample GIFs to this framerate if they are higher. |
-| `max_width`| int (1-1024)| `480` | Downscale GIFs to this maximum width or height. |
-
-## API
-
-Serve static files directly through nginx, Echo-Vault also exposes `/{hash}.{ext}` for completeness, but letting nginx handle static files is faster.
+To support the Web UI, Nginx should proxy requests to the backend. You can still serve storage files directly via Nginx for maximum performance if desired.
 
 ```nginx
-location / {
-    root /path/to/your/storage;
+# Serve images directly (optional, for performance)
+location /i/ {
+    alias /path/to/your/storage/;
 
     expires 30d;
 }
 
-location ~ ^/(upload|echos) {
+# Proxy UI and API
+location / {
     proxy_pass       http://localhost:8080;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Host            $host;
+
+    # Required for large uploads
+    client_max_body_size 100M;
 }
 ```
 
 ### Authentication
 
-All API routes under `/upload` and `/echos` expect `Authorization: Bearer <token>` (from `server.token`).
+All API routes under `/upload` and `/echos` expect `Authorization: Bearer <token>`. The Web UI handles this automatically via a login prompt.
+
+### `GET /info`
+
+Returns the current server version.
+
+```json
+{
+    "version": "dev"
+}
+```
+
+### `GET /verify`
+
+Used to check token validity. Returns `200 OK` or `401 Unauthorized`.
 
 ### `POST /upload`
 
@@ -140,7 +142,7 @@ Upload a file via multipart form (`upload=<file>`). Supported types: JPEG, PNG, 
         "store": "5.0093ms",
         "write": "1.2276779s"
     },
-    "url": "http://localhost:8080/ASODE3CEHE.mp4"
+    "url": "http://localhost:8080/i/ASODE3CEHE.mp4"
 }
 ```
 
