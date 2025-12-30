@@ -58,6 +58,8 @@ func viewEchoHandler(w http.ResponseWriter, r *http.Request) {
 
 	defer file.Close()
 
+	w.Header().Set("Cache-Control", "public, max-age=604800, must-revalidate")
+
 	okay(w)
 
 	io.Copy(w, file)
