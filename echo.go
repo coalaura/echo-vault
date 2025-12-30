@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -14,6 +15,20 @@ type Echo struct {
 	Extension  string `json:"extension"`
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
+}
+
+type echoAlias Echo
+
+type jsonEcho struct {
+	echoAlias
+	URL string `json:"url"`
+}
+
+func (e Echo) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&jsonEcho{
+		echoAlias: echoAlias(e),
+		URL:       e.URL(),
+	})
 }
 
 func (e *Echo) Fill() error {
@@ -38,7 +53,11 @@ func (e *Echo) Storage() string {
 }
 
 func (e *Echo) URL() string {
-	return fmt.Sprintf("%s/i/%s.%s", config.Server.URL, e.Hash, e.Extension)
+	if config.Server.Direct {
+		return fmt.Sprintf("%s%s.%s", config.Server.URL, e.Hash, e.Extension)
+	}
+
+	return fmt.Sprintf("%si/%s.%s", config.Server.URL, e.Hash, e.Extension)
 }
 
 func (e *Echo) Exists() bool {

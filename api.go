@@ -11,6 +11,8 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+const PageSize = 100
+
 func infoHandler(w http.ResponseWriter, r *http.Request) {
 	okay(w, "application/json")
 
@@ -102,7 +104,7 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 
 	page = max(1, page)
 
-	echos, err := database.FindAll((page-1)*15, 15)
+	echos, err := database.FindAll((page-1)*PageSize, PageSize)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 

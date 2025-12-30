@@ -1,5 +1,6 @@
 (() => {
-	const StorageKey = "echo_vault_token";
+	const StorageKey = "echo_vault_token",
+		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"];
 
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
@@ -43,6 +44,29 @@
 		}
 
 		setupEventListeners();
+	}
+
+	function formatBytes(bytes) {
+		if (bytes === 0) {
+			return "0 B";
+		}
+
+		const k = 1000,
+			sizes = ["B", "kB", "MB", "GB", "TB"];
+
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+		return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+	}
+
+	function formatDate(timestamp) {
+		if (!timestamp) {
+			return "";
+		}
+
+		const date = new Date(timestamp * 1000);
+
+		return date.toISOString().split("T")[0];
 	}
 
 	function showNotification(message, type = "info") {
@@ -200,9 +224,9 @@
 		list.forEach(item => {
 			echoCache.set(item.hash, item);
 
-			const ext = item.ext || item.extension,
-				url = `${window.location.origin}/i/${item.hash}.${ext}`,
-				isVideo = ext === "mp4" || ext === "webm";
+			const ext = item.ext,
+				url = item.url,
+				isVideo = VideoExtensions.includes(ext);
 
 			const card = document.createElement("div");
 
@@ -217,12 +241,18 @@
 				media = `<img src="${url}" class="echo-media" loading="lazy">`;
 			}
 
+			const link = `<a href="${url}" target="_blank" class="echo-link">${media}</a>`;
+
 			card.innerHTML = `
-                ${media}
+                ${link}
                 <div class="echo-actions">
                     <button class="action-btn" data-action="copy" data-hash="${item.hash}">COPY</button>
                     <button class="action-btn delete" data-action="delete" data-hash="${item.hash}">DEL</button>
                 </div>
+				<div class="echo-info">
+					<span>${formatDate(item.timestamp)}</span>
+					<span>${formatBytes(item.upload_size)}</span>
+				</div>
             `;
 
 			fragment.appendChild(card);
@@ -242,9 +272,9 @@
 			return;
 		}
 
-		const ext = item.ext || item.extension,
-			url = `${window.location.origin}/i/${item.hash}.${ext}`,
-			isVideo = ext === "mp4" || ext === "webm";
+		const ext = item.ext,
+			url = item.url,
+			isVideo = VideoExtensions.includes(ext);
 
 		$modalContent.innerHTML = "";
 
@@ -279,8 +309,7 @@
 			return;
 		}
 
-		const ext = item.ext || item.extension,
-			url = `${window.location.origin}/i/${item.hash}.${ext}`;
+		const url = item.url;
 
 		try {
 			await navigator.clipboard.writeText(url);
@@ -384,9 +413,12 @@
 		$gallery.addEventListener("click", async event => {
 			const target = event.target,
 				btn = target.closest("button"),
-				card = target.closest(".echo-card");
+				link = target.closest(".echo-link");
 
 			if (btn) {
+				event.preventDefault();
+				event.stopPropagation();
+
 				const action = btn.dataset.action,
 					hash = btn.dataset.hash;
 
@@ -399,7 +431,15 @@
 				return;
 			}
 
-			if (card) {
+			if (link) {
+				if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+					return;
+				}
+
+				event.preventDefault();
+
+				const card = link.closest(".echo-card");
+
 				openModal(card.dataset.hash);
 			}
 		});
