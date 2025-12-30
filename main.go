@@ -1,7 +1,9 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
+	"io/fs"
 	"net/http"
 	"os"
 
@@ -16,8 +18,8 @@ var (
 	config   *EchoConfig
 	database *EchoDatabase
 
-	//go:embed favicon.ico
-	favicon []byte
+	//go:embed public/*
+	publicFs embed.FS
 
 	log = plain.New(plain.WithDate(plain.RFC3339Local))
 )
@@ -26,6 +28,9 @@ func main() {
 	log.Printf("Echo-Vault %s\n", Version)
 
 	err := os.MkdirAll("./storage", 0755)
+	log.MustFail(err)
+
+	public, err := fs.Sub(publicFs, "public")
 	log.MustFail(err)
 
 	log.Println("Loading config...")
@@ -45,6 +50,12 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(log.Middleware())
 
+	fs := http.FileServer(http.FS(public))
+	r.Handle("/*", fs)
+
+	r.Get("/info", infoHandler)
+	r.Get("/verify", verifyHandler)
+
 	r.Group(func(gr chi.Router) {
 		gr.Use(authenticate)
 
@@ -53,13 +64,7 @@ func main() {
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 
-	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		okay(w)
-
-		w.Write(favicon)
-	})
-
-	r.Get("/{hash}.{ext}", viewEchoHandler)
+	r.Get("/i/{hash}.{ext}", viewEchoHandler)
 
 	addr := config.Addr()
 

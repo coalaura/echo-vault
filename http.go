@@ -1,14 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 )
 
-func abort(w http.ResponseWriter, code int) {
-	w.Header().Add("Content-Type", "text/plain")
+func abort(w http.ResponseWriter, code int, err string) {
+	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(code)
 
-	w.Write([]byte(http.StatusText(code)))
+	json.NewEncoder(w).Encode(map[string]string{
+		"error": err,
+	})
 }
 
 func okay(w http.ResponseWriter, ct ...string) {
