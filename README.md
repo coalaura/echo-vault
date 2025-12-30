@@ -12,6 +12,8 @@ A blazing fast, minimal ShareX backend written in Go. Echo-Vault features a powe
 - Import existing files straight into the database with the `scan` command
 - Commented `config.yml` generated on first run
 
+![example](.github/example.png)
+
 ## Installation
 
 1. Download the [latest release](https://github.com/coalaura/echo-vault/releases/latest) or build from source.
@@ -43,6 +45,8 @@ server:
   url: http://localhost:8080/
   # port to run echo-vault on (default: 8080)
   port: 8080
+  # only append the filename to the base url, no "/i/" (for custom endpoints; default: false)
+  direct: false
   # upload token for authentication, leave empty to disable auth (default: p4$$w0rd)
   token: p4$$w0rd
   # maximum upload file-size in MB (default: 10MB)

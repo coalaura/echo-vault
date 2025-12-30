@@ -13,6 +13,7 @@ import (
 type EchoConfigServer struct {
 	URL            string `yaml:"url"`
 	Port           int    `yaml:"port"`
+	Direct         bool   `yaml:"direct"`
 	UploadToken    string `yaml:"token"`
 	MaxFileSize    int    `yaml:"max_file_size"`
 	MaxConcurrency int    `yaml:"max_concurrency"`
@@ -56,6 +57,7 @@ func NewDefaultConfig() EchoConfig {
 		Server: EchoConfigServer{
 			URL:            "http://localhost:8080/",
 			Port:           8080,
+			Direct:         false,
 			UploadToken:    "p4$$w0rd",
 			MaxFileSize:    10,
 			MaxConcurrency: 4,
@@ -216,6 +218,7 @@ func (e *EchoConfig) Store() error {
 	comments := yaml.CommentMap{
 		"$.server.url":             {yaml.HeadComment(fmt.Sprintf(" base url of your instance (default: %v)", def.Server.URL))},
 		"$.server.port":            {yaml.HeadComment(fmt.Sprintf(" port to run echo-vault on (default: %v)", def.Server.Port))},
+		"$.server.direct":          {yaml.HeadComment(fmt.Sprintf(" only append the filename to the base url, no \"/i/\" (for custom endpoints; default: %v)", def.Server.Direct))},
 		"$.server.token":           {yaml.HeadComment(fmt.Sprintf(" upload token for authentication, leave empty to disable auth (default: %v)", def.Server.UploadToken))},
 		"$.server.max_file_size":   {yaml.HeadComment(fmt.Sprintf(" maximum upload file-size in MB (default: %vMB)", def.Server.MaxFileSize))},
 		"$.server.max_concurrency": {yaml.HeadComment(fmt.Sprintf(" maximum concurrent uploads (default: %v)", def.Server.MaxConcurrency))},
