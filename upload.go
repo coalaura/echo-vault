@@ -177,8 +177,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	echo.Size = stat.Size()
 
-	usage.Add(uint64(echo.Size))
-
 	timer.Stop("write").Start("store")
 
 	err = database.Create(echo)
@@ -192,6 +190,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	usage.Add(uint64(echo.Size))
+	count.Add(1)
 
 	timer.Stop("store")
 
