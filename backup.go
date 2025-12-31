@@ -209,9 +209,11 @@ func CreateBackup(now time.Time) (*Backup, error) {
 }
 
 func WriteBackup(wr *tar.Writer) error {
+	buf := make([]byte, 1024*1024)
+
 	log.Println("Backing up database...")
 
-	err := AddFileToBackup(wr, DatabasePath)
+	err := AddFileToBackup(wr, DatabasePath, buf)
 	if err != nil {
 		return err
 	}
@@ -231,7 +233,7 @@ func WriteBackup(wr *tar.Writer) error {
 
 	defer dir.Close()
 
-	err = WriteFileToBackup(wr, dir, StorageDirectory)
+	err = WriteFileToBackup(wr, dir, StorageDirectory, buf)
 	if err != nil {
 		return err
 	}
@@ -252,7 +254,7 @@ func WriteBackup(wr *tar.Writer) error {
 
 		path = filepath.ToSlash(path)
 
-		err = AddFileToBackup(wr, path)
+		err = AddFileToBackup(wr, path, buf)
 		if err != nil {
 			return err
 		}
@@ -261,7 +263,7 @@ func WriteBackup(wr *tar.Writer) error {
 	return nil
 }
 
-func AddFileToBackup(wr *tar.Writer, path string) error {
+func AddFileToBackup(wr *tar.Writer, path string, buf []byte) error {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return err
@@ -269,10 +271,10 @@ func AddFileToBackup(wr *tar.Writer, path string) error {
 
 	defer file.Close()
 
-	return WriteFileToBackup(wr, file, path)
+	return WriteFileToBackup(wr, file, path, buf)
 }
 
-func WriteFileToBackup(wr *tar.Writer, file *os.File, path string) error {
+func WriteFileToBackup(wr *tar.Writer, file *os.File, path string, buf []byte) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
@@ -297,7 +299,7 @@ func WriteFileToBackup(wr *tar.Writer, file *os.File, path string) error {
 	}
 
 	if !info.IsDir() {
-		_, err = io.Copy(wr, file)
+		_, err = io.CopyBuffer(wr, file, buf)
 		if err != nil {
 			return err
 		}
