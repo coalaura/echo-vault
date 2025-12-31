@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"github.com/coalaura/plain"
 	"github.com/go-chi/chi/v5"
@@ -17,6 +18,7 @@ var Version = "dev"
 var (
 	config   *EchoConfig
 	database *EchoDatabase
+	usage    atomic.Uint64
 
 	//go:embed public/*
 	publicFs embed.FS
@@ -43,8 +45,10 @@ func main() {
 	database, err = ConnectToDatabase()
 	log.MustFail(err)
 
-	err = database.Verify()
+	size, err := database.Verify()
 	log.MustFail(err)
+
+	usage.Add(size)
 
 	handleTasks()
 

@@ -116,7 +116,10 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 
 	okay(w, "application/json")
 
-	json.NewEncoder(w).Encode(echos)
+	json.NewEncoder(w).Encode(map[string]any{
+		"echos": echos,
+		"size":  usage.Load(),
+	})
 }
 
 func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {

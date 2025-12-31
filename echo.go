@@ -70,11 +70,19 @@ func (e *Echo) Exists() bool {
 func (e *Echo) Unlink() error {
 	file := e.Storage()
 
-	if _, err := os.Stat(file); os.IsNotExist(err) {
+	_, err := os.Stat(file)
+	if os.IsNotExist(err) {
 		return nil
 	}
 
-	return os.Remove(file)
+	err = os.Remove(file)
+	if err != nil {
+		return err
+	}
+
+	usage.Add(^uint64(e.Size - 1))
+
+	return nil
 }
 
 func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error) {

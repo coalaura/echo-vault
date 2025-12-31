@@ -150,23 +150,24 @@ func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	return nil
 }
 
-func (d *EchoDatabase) Verify() error {
+func (d *EchoDatabase) Verify() (uint64, error) {
 	var total int64
 
 	err := d.QueryRow("SELECT COUNT(id) FROM echos").Scan(&total)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if total == 0 {
-		return nil
+		return 0, nil
 	}
 
 	var (
 		wg        sync.WaitGroup
 		echos     []Echo
-		completed atomic.Uint32
+		completed atomic.Uint64
 		offset    int
+		totalSize uint64
 
 		done = make(chan bool)
 	)
@@ -222,6 +223,8 @@ func (d *EchoDatabase) Verify() error {
 						log.Warnf("Failed to update size (%s): %v\n", echo.Hash, szErr)
 					}
 				}
+
+				totalSize += uint64(size)
 			}
 
 			completed.Add(1)
@@ -239,7 +242,7 @@ func (d *EchoDatabase) Verify() error {
 	wg.Wait()
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	log.Printf("Verifying 100%% (%d of %d)\n", total, total)
@@ -253,7 +256,7 @@ func (d *EchoDatabase) Verify() error {
 
 			_, err := d.Exec(fmt.Sprintf("DELETE FROM echos WHERE hash IN (%s)", placeholders), invalid...)
 			if err != nil {
-				return err
+				return 0, err
 			}
 
 			log.Println("Completed")
@@ -262,5 +265,5 @@ func (d *EchoDatabase) Verify() error {
 		}
 	}
 
-	return nil
+	return totalSize, nil
 }

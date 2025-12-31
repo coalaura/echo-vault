@@ -145,12 +145,30 @@ header {
 	white-space: nowrap;
 }
 
+#total-size,
 .version-tag {
 	font-family: var(--font-mono);
 	color: var(--text-muted);
 	font-size: 0.75rem;
 	margin-left: 0.5rem;
 	font-weight: 400;
+}
+
+#total-size {
+	position: relative;
+	padding-left: 1.1rem;
+}
+
+#total-size::before {
+	content: "";
+	background: var(--text-muted);
+	height: 0.1rem;
+	width: 0.4rem;
+	display: block;
+	position: absolute;
+	left: 0;
+	top: 50%;
+	transform: translateY(-50%);
 }
 
 .actions {
@@ -225,6 +243,8 @@ header {
 	gap: 0.25rem;
 	opacity: 0;
 	transition: opacity 0.2s;
+	height: 100%;
+	align-items: end;
 }
 
 .echo-card:hover .echo-actions {
