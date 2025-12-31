@@ -15,6 +15,7 @@
 		$fileInput = document.getElementById("file-input"),
 		$uploadBtn = document.getElementById("upload-trigger"),
 		$logoutBtn = document.getElementById("logout-btn"),
+		$totalSize = document.getElementById("total-size"),
 		$versionTags = document.querySelectorAll(".version-tag"),
 		$modalContent = document.querySelector(".modal-content"),
 		$modalBackdrop = document.querySelector(".modal-backdrop");
@@ -24,7 +25,8 @@
 		isLoading = false,
 		hasMore = true,
 		dragCounter = 0,
-		echoCache = new Map();
+		echoCache = new Map(),
+		totalSize = 0;
 
 	let $notifyArea;
 
@@ -195,7 +197,7 @@
 
 			const data = await response.json();
 
-			if (!data || data.length === 0) {
+			if (!data || !data?.echos?.length) {
 				hasMore = false;
 
 				if (currentPage === 1) {
@@ -204,7 +206,11 @@
 			} else {
 				$emptyState.classList.add("hidden");
 
-				renderItems(data, false);
+				totalSize = data.size || 0;
+
+				$totalSize.textContent = formatBytes(totalSize);
+
+				renderItems(data.echos, false);
 
 				currentPage++;
 			}
@@ -337,7 +343,7 @@
 		$uploadBtn.disabled = true;
 
 		try {
-			const response = await fetchWithAuth("/upload", null, {
+			const response = await fetchWithAuth("/upload?return", null, {
 				method: "POST",
 				body: formData,
 			});
@@ -348,7 +354,15 @@
 				throw new Error(msg);
 			}
 
-			const newEcho = await response.json();
+			const newEcho = (await response.json())?.echo;
+
+			if (!newEcho) {
+				throw new Error("invalid response");
+			}
+
+			totalSize += newEcho.size;
+
+			$totalSize.textContent = formatBytes(totalSize);
 
 			$emptyState.classList.add("hidden");
 

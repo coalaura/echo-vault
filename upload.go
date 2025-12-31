@@ -149,8 +149,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("read").Start("write")
 
-	stored := echo.Storage()
-
 	size, err := echo.SaveUploadedFile(r.Context(), path)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "failed to save to permanent storage")
@@ -158,10 +156,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		log.Warnln("upload: failed to save uploaded file")
 		log.Warnln(err)
 
-		os.Remove(stored)
+		os.Remove(echo.Storage())
 
 		return
 	}
+
+	stored := echo.Storage()
 
 	stat, err := os.Stat(stored)
 	if err != nil {
@@ -176,6 +176,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	echo.Size = stat.Size()
+
+	usage.Add(uint64(echo.Size))
 
 	timer.Stop("write").Start("store")
 
@@ -195,15 +197,20 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	okay(w, "application/json")
 
-	json.NewEncoder(w).Encode(map[string]any{
+	result := map[string]any{
 		"hash":      echo.Hash,
 		"sniffed":   sniffed,
 		"extension": echo.Extension,
 		"url":       echo.URL(),
-		"size":      byteCountSI(size),
 		"change":    formatSizeChange(echo.UploadSize, size),
 		"timing":    timer,
-	})
+	}
+
+	if r.URL.Query().Has("return") {
+		result["echo"] = echo
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func byteCountSI(b int64) string {
