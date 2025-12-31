@@ -119,6 +119,7 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"echos": echos,
 		"size":  usage.Load(),
+		"count": count.Load(),
 	})
 }
 
