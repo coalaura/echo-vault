@@ -68,6 +68,6 @@ func main() {
 
 	addr := config.Addr()
 
-	log.Printf("Listening at %s\n", addr)
+	log.Printf("Listening at http://localhost%s/\n", addr)
 	http.ListenAndServe(addr, r)
 }
