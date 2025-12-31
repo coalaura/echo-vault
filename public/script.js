@@ -401,7 +401,15 @@
 				card.remove();
 			}
 
-			echoCache.delete(hash);
+			const echo = echoCache.get(hash);
+
+			if (echo) {
+				totalSize -= echo.size;
+
+				$totalSize.textContent = formatBytes(totalSize);
+
+				echoCache.delete(hash);
+			}
 
 			if ($gallery.children.length === 0) {
 				$emptyState.classList.remove("hidden");
