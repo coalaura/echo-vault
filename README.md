@@ -1,4 +1,4 @@
-![banner](.github/banner.png)
+![banner](.github/banner.jpg)
 
 A blazing fast, minimal ShareX backend written in Go. Echo-Vault features a powerful, configurable media processing pipeline and a built-in, dependency-free dark mode dashboard. It leverages `ffmpeg` and `gifsicle` to handle transcoding and optimization, keeping the core service lean while giving you full control over your media.
 
