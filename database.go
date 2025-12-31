@@ -12,14 +12,17 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const VerifyChunkSize = 1024
+const (
+	DatabasePath    = "echo.db"
+	VerifyChunkSize = 1024
+)
 
 type EchoDatabase struct {
 	*sql.DB
 }
 
 func ConnectToDatabase() (*EchoDatabase, error) {
-	db, err := sql.Open("sqlite", "./echo.db")
+	db, err := sql.Open("sqlite", DatabasePath)
 	if err != nil {
 		return nil, err
 	}

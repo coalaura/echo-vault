@@ -1,4 +1,5 @@
 echo.db
 storage
+backups
 config.yml
 echo_vault

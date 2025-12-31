@@ -7,6 +7,14 @@ import (
 
 const StorageDirectory = "storage"
 
+func EnsureStorage() error {
+	if _, err := os.Stat(StorageDirectory); !os.IsNotExist(err) {
+		return err
+	}
+
+	return os.MkdirAll("./storage", 0755)
+}
+
 func storageAbs() (string, error) {
 	info, err := os.Lstat(StorageDirectory)
 	if err != nil {
