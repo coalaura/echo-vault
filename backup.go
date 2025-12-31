@@ -348,12 +348,10 @@ func WriteFileToBackup(wr *tar.Writer, file *os.File, path string, buf []byte) e
 		return err
 	}
 
-	if !info.IsDir() {
-		_, err = io.CopyBuffer(wr, file, buf)
-		if err != nil {
-			return err
-		}
+	if info.IsDir() {
+		return nil
 	}
 
-	return nil
+	_, err = io.CopyBuffer(wr, file, buf)
+	return err
 }
