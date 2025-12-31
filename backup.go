@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -247,7 +249,40 @@ func WriteBackup(wr *tar.Writer) error {
 		return err
 	}
 
-	log.Printf("Backing up %d files...\n", len(files))
+	var (
+		wg        sync.WaitGroup
+		completed atomic.Uint64
+		total     = len(files)
+		done      = make(chan bool)
+	)
+
+	log.Printf("Backing up 0%% (0 of %d)\n", total)
+
+	ticker := time.NewTicker(time.Second)
+
+	defer ticker.Stop()
+
+	wg.Go(func() {
+		totalF := float64(total)
+
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				current := completed.Load()
+				percentage := float64(current) / totalF * 100
+
+				log.Printf("Backing up %.1f%% (%d of %d)\n", percentage, current, total)
+			}
+		}
+	})
+
+	defer func() {
+		close(done)
+
+		wg.Wait()
+	}()
 
 	for _, file := range files {
 		path := filepath.Join(StorageDirectory, file.Name())
@@ -258,6 +293,8 @@ func WriteBackup(wr *tar.Writer) error {
 		if err != nil {
 			return err
 		}
+
+		completed.Add(1)
 	}
 
 	return nil
