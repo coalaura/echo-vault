@@ -43,6 +43,9 @@ func main() {
 	database, err = ConnectToDatabase()
 	log.MustFail(err)
 
+	err = database.Verify()
+	log.MustFail(err)
+
 	handleTasks()
 
 	r := chi.NewRouter()

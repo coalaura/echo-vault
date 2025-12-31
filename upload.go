@@ -149,6 +149,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("read").Start("write")
 
+	stored := echo.Storage()
+
 	size, err := echo.SaveUploadedFile(r.Context(), path)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "failed to save to permanent storage")
@@ -156,10 +158,24 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		log.Warnln("upload: failed to save uploaded file")
 		log.Warnln(err)
 
-		os.Remove(echo.Storage())
+		os.Remove(stored)
 
 		return
 	}
+
+	stat, err := os.Stat(stored)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "failed to save to permanent storage")
+
+		log.Warnln("upload: failed to stat uploaded file")
+		log.Warnln(err)
+
+		os.Remove(stored)
+
+		return
+	}
+
+	echo.Size = stat.Size()
 
 	timer.Stop("write").Start("store")
 

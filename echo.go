@@ -13,6 +13,7 @@ type Echo struct {
 	Hash       string `json:"hash"`
 	Name       string `json:"name"`
 	Extension  string `json:"extension"`
+	Size       int64  `json:"size"`
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
 }

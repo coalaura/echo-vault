@@ -17,6 +17,7 @@ type EchoConfigServer struct {
 	UploadToken    string `yaml:"token"`
 	MaxFileSize    int    `yaml:"max_file_size"`
 	MaxConcurrency int    `yaml:"max_concurrency"`
+	DeleteOrphans  bool   `yaml:"delete_orphans"`
 }
 
 type EchoConfigImages struct {
@@ -61,6 +62,7 @@ func NewDefaultConfig() EchoConfig {
 			UploadToken:    "p4$$w0rd",
 			MaxFileSize:    10,
 			MaxConcurrency: 4,
+			DeleteOrphans:  false,
 		},
 		Images: EchoConfigImages{
 			Format:  "webp",
@@ -222,6 +224,7 @@ func (e *EchoConfig) Store() error {
 		"$.server.token":           {yaml.HeadComment(fmt.Sprintf(" upload token for authentication, leave empty to disable auth (default: %v)", def.Server.UploadToken))},
 		"$.server.max_file_size":   {yaml.HeadComment(fmt.Sprintf(" maximum upload file-size in MB (default: %vMB)", def.Server.MaxFileSize))},
 		"$.server.max_concurrency": {yaml.HeadComment(fmt.Sprintf(" maximum concurrent uploads (default: %v)", def.Server.MaxConcurrency))},
+		"$.server.delete_orphans":  {yaml.HeadComment(fmt.Sprintf(" if echos without their file should be deleted (default: %v)", def.Server.DeleteOrphans))},
 
 		"$.images.format":  {yaml.HeadComment(fmt.Sprintf(" target format for images (webp, png or jpeg; default: %v)", def.Images.Format))},
 		"$.images.effort":  {yaml.HeadComment(fmt.Sprintf(" quality/speed trade-off (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.Images.Effort))},

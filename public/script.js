@@ -251,7 +251,7 @@
                 </div>
 				<div class="echo-info">
 					<span>${formatDate(item.timestamp)}</span>
-					<span>${formatBytes(item.upload_size)}</span>
+					<span>${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}</span>
 				</div>
             `;
 
