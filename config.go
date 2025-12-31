@@ -192,7 +192,7 @@ func (c *EchoConfig) Validate() error {
 	}
 
 	// check gifsicle dependency
-	if c.GIFs.Optimize {
+	if (c.GIFs.Enabled || (c.Videos.Enabled && c.Videos.Format == "gif")) && c.GIFs.Optimize {
 		gifsicle, err := exec.LookPath("gifsicle")
 		if err != nil {
 			return errors.New("gifsicle is required for gifs.optimize")
