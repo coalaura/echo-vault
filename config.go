@@ -23,7 +23,7 @@ type EchoConfigServer struct {
 type EchoConfigBackup struct {
 	Enabled     bool `yaml:"enabled"`
 	Interval    int  `yaml:"interval"`
-	KeepTime    int  `yaml:"keep_time"`
+	KeepAmount  int  `yaml:"keep_amount"`
 	BackupFiles bool `yaml:"backup_files"`
 }
 
@@ -74,8 +74,8 @@ func NewDefaultConfig() EchoConfig {
 		},
 		Backup: EchoConfigBackup{
 			Enabled:     true,
-			Interval:    24,
-			KeepTime:    7 * 24,
+			Interval:    5 * 24,
+			KeepAmount:  4,
 			BackupFiles: true,
 		},
 		Images: EchoConfigImages{
@@ -155,8 +155,8 @@ func (c *EchoConfig) Validate() error {
 			return fmt.Errorf("backup.interval must be >= 1, got %d", c.Backup.Interval)
 		}
 
-		if c.Backup.KeepTime <= 0 {
-			return fmt.Errorf("backup.keep_time must be >= 1, got %d", c.Backup.KeepTime)
+		if c.Backup.KeepAmount <= 0 {
+			return fmt.Errorf("backup.keep_amountt must be >= 1, got %d", c.Backup.KeepAmount)
 		}
 	}
 
@@ -253,7 +253,7 @@ func (e *EchoConfig) Store() error {
 
 		"$.backup.enabled":      {yaml.HeadComment(fmt.Sprintf(" if backups should be created (default: %v)", def.Backup.Enabled))},
 		"$.backup.interval":     {yaml.HeadComment(fmt.Sprintf(" how often backups should be created (in hours; default: %v)", def.Backup.Interval))},
-		"$.backup.keep_time":    {yaml.HeadComment(fmt.Sprintf(" how long to keep backups before deleting (in hours; default: %v)", def.Backup.KeepTime))},
+		"$.backup.keep_amount":  {yaml.HeadComment(fmt.Sprintf(" how many backups to keep before deleting the oldest (default: %v)", def.Backup.KeepAmount))},
 		"$.backup.backup_files": {yaml.HeadComment(fmt.Sprintf(" if files (images/videos) should be included in backups (without, only the database is backed up; default: %v)", def.Backup.BackupFiles))},
 
 		"$.images.format":  {yaml.HeadComment(fmt.Sprintf(" target format for images (webp, png or jpeg; default: %v)", def.Images.Format))},

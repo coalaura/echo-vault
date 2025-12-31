@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,12 @@ type Backup struct {
 
 type BackupList struct {
 	Backups []*Backup
+}
+
+func (b *Backup) Exists() bool {
+	_, err := os.Stat(b.Path)
+
+	return !os.IsNotExist(err)
 }
 
 func (b *BackupList) Next() (time.Duration, time.Time) {
@@ -54,26 +61,32 @@ func (b *BackupList) Evict() error {
 		return nil
 	}
 
-	oldest := time.Now().UTC().Add(-time.Duration(config.Backup.KeepTime) * time.Hour)
-
-	evicted := make([]*Backup, 0, len(b.Backups))
+	clean := make([]*Backup, 0, len(b.Backups))
 
 	for _, backup := range b.Backups {
-		if backup.Time.After(oldest) {
-			evicted = append(evicted, backup)
-
+		if !backup.Exists() {
 			continue
 		}
 
-		log.Printf("Evicting old backup: %s\n", backup.Path)
-
-		err := os.Remove(backup.Path)
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
+		clean = append(clean, backup)
 	}
 
-	b.Backups = evicted
+	sort.Slice(clean, func(i, j int) bool {
+		return clean[i].Time.Before(clean[j].Time)
+	})
+
+	for len(clean) > config.Backup.KeepAmount {
+		evict := clean[0]
+
+		log.Printf("Evicting %s...\n", evict.Path)
+
+		err := os.Remove(evict.Path)
+		if err != nil {
+			return err
+		}
+
+		clean = clean[1:]
+	}
 
 	return nil
 }
