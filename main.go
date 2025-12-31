@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"io/fs"
 	"net/http"
-	"os"
 	"sync/atomic"
 
 	"github.com/coalaura/plain"
@@ -30,7 +29,7 @@ var (
 func main() {
 	log.Printf("Echo-Vault %s\n", Version)
 
-	err := os.MkdirAll("./storage", 0755)
+	err := EnsureStorage()
 	log.MustFail(err)
 
 	public, err := fs.Sub(publicFs, "public")
@@ -47,6 +46,9 @@ func main() {
 	log.MustFail(err)
 
 	size, total, err := database.Verify()
+	log.MustFail(err)
+
+	err = StartBackupLoop()
 	log.MustFail(err)
 
 	usage.Add(size)

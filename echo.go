@@ -86,7 +86,12 @@ func (e *Echo) Unlink() error {
 }
 
 func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error) {
-	err := e.Fill()
+	err := EnsureStorage()
+	if err != nil {
+		return 0, err
+	}
+
+	err = e.Fill()
 	if err != nil {
 		return 0, err
 	}

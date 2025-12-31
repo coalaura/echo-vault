@@ -20,6 +20,13 @@ type EchoConfigServer struct {
 	DeleteOrphans  bool   `yaml:"delete_orphans"`
 }
 
+type EchoConfigBackup struct {
+	Enabled     bool `yaml:"enabled"`
+	Interval    int  `yaml:"interval"`
+	KeepTime    int  `yaml:"keep_time"`
+	BackupFiles bool `yaml:"backup_files"`
+}
+
 type EchoConfigImages struct {
 	Format  string `yaml:"format"`
 	Effort  int    `yaml:"effort"`
@@ -48,6 +55,7 @@ type EchoConfig struct {
 	gifsicle string
 
 	Server EchoConfigServer `yaml:"server"`
+	Backup EchoConfigBackup `yaml:"backup"`
 	Images EchoConfigImages `yaml:"images"`
 	Videos EchoConfigVideos `yaml:"videos"`
 	GIFs   EchoConfigGIFs   `yaml:"gifs"`
@@ -63,6 +71,12 @@ func NewDefaultConfig() EchoConfig {
 			MaxFileSize:    10,
 			MaxConcurrency: 4,
 			DeleteOrphans:  false,
+		},
+		Backup: EchoConfigBackup{
+			Enabled:     true,
+			Interval:    24,
+			KeepTime:    7 * 24,
+			BackupFiles: true,
 		},
 		Images: EchoConfigImages{
 			Format:  "webp",
@@ -133,6 +147,17 @@ func (c *EchoConfig) Validate() error {
 
 	if c.Server.MaxConcurrency < 1 {
 		return fmt.Errorf("server.max_concurrency must be >= 1, got %d", c.Server.MaxConcurrency)
+	}
+
+	// backup
+	if c.Backup.Enabled {
+		if c.Backup.Interval <= 0 {
+			return fmt.Errorf("backup.interval must be >= 1, got %d", c.Backup.Interval)
+		}
+
+		if c.Backup.KeepTime <= 0 {
+			return fmt.Errorf("backup.keep_time must be >= 1, got %d", c.Backup.KeepTime)
+		}
 	}
 
 	// images
@@ -225,6 +250,11 @@ func (e *EchoConfig) Store() error {
 		"$.server.max_file_size":   {yaml.HeadComment(fmt.Sprintf(" maximum upload file-size in MB (default: %vMB)", def.Server.MaxFileSize))},
 		"$.server.max_concurrency": {yaml.HeadComment(fmt.Sprintf(" maximum concurrent uploads (default: %v)", def.Server.MaxConcurrency))},
 		"$.server.delete_orphans":  {yaml.HeadComment(fmt.Sprintf(" if echos without their file should be deleted (default: %v)", def.Server.DeleteOrphans))},
+
+		"$.backup.enabled":      {yaml.HeadComment(fmt.Sprintf(" if backups should be created (default: %v)", def.Backup.Enabled))},
+		"$.backup.interval":     {yaml.HeadComment(fmt.Sprintf(" how often backups should be created (in hours; default: %v)", def.Backup.Interval))},
+		"$.backup.keep_time":    {yaml.HeadComment(fmt.Sprintf(" how long to keep backups before deleting (in hours; default: %v)", def.Backup.KeepTime))},
+		"$.backup.backup_files": {yaml.HeadComment(fmt.Sprintf(" if files (images/videos) should be included in backups (without, only the database is backed up; default: %v)", def.Backup.BackupFiles))},
 
 		"$.images.format":  {yaml.HeadComment(fmt.Sprintf(" target format for images (webp, png or jpeg; default: %v)", def.Images.Format))},
 		"$.images.effort":  {yaml.HeadComment(fmt.Sprintf(" quality/speed trade-off (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.Images.Effort))},
