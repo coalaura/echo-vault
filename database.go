@@ -2,9 +2,17 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+const VerifyChunkSize = 1024
 
 type EchoDatabase struct {
 	*sql.DB
@@ -16,6 +24,9 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 		return nil, err
 	}
 
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+
 	b := NewTableBuilder(db, "echos")
 
 	err = b.Create()
@@ -24,12 +35,18 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	}
 
 	err = b.AddColumns([]SQLiteColumn{
-		{"hash", "TEXT NOT NULL"},
+		{"hash", "TEXT NOT NULL UNIQUE"},
 		{"name", "TEXT NOT NULL"},
 		{"extension", "TEXT NOT NULL"},
-		{"upload_size", "INTEGER NOT NULL"},
-		{"timestamp", "INTEGER NOT NULL"},
+		{"size", "INTEGER NOT NULL DEFAULT 0"},
+		{"upload_size", "INTEGER NOT NULL DEFAULT 0"},
+		{"timestamp", "INTEGER NOT NULL DEFAULT 0"},
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS idx_echos_timestamp ON echos(timestamp)")
 	if err != nil {
 		return nil, err
 	}
@@ -38,20 +55,20 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 }
 
 func (d *EchoDatabase) Exists(hash string) (bool, error) {
-	var count int
+	var exists bool
 
-	err := d.QueryRow("SELECT COUNT(id) FROM echos WHERE hash = ?", hash).Scan(&count)
+	err := d.QueryRow("SELECT EXISTS(SELECT 1 FROM echos WHERE hash = ?)", hash).Scan(&exists)
 	if err != nil {
 		return false, err
 	}
 
-	return count > 0, nil
+	return exists, nil
 }
 
 func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 	var e Echo
 
-	err := d.QueryRow("SELECT id, hash, name, extension, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
+	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -64,22 +81,29 @@ func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 }
 
 func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
-	rows, err := database.Query("SELECT id, hash, name, extension, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
+
+	defer rows.Close()
 
 	var echos []Echo
 
 	for rows.Next() {
 		var e Echo
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.UploadSize, &e.Timestamp)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp)
 		if err != nil {
 			return nil, err
 		}
 
 		echos = append(echos, e)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
 	return echos, nil
@@ -91,7 +115,7 @@ func (d *EchoDatabase) Create(echo *Echo) error {
 		return err
 	}
 
-	_, err = database.Exec("INSERT INTO echos (hash, name, extension, upload_size, timestamp) VALUES (?, ?, ?, ?, ?)", echo.Hash, echo.Name, echo.Extension, echo.UploadSize, echo.Timestamp)
+	_, err = d.Exec("INSERT INTO echos (hash, name, extension, size, upload_size, timestamp) VALUES (?, ?, ?, ?, ?, ?)", echo.Hash, echo.Name, echo.Extension, echo.Size, echo.UploadSize, echo.Timestamp)
 	if err != nil {
 		return err
 	}
@@ -100,7 +124,7 @@ func (d *EchoDatabase) Create(echo *Echo) error {
 }
 
 func (d *EchoDatabase) Delete(hash string) error {
-	_, err := database.Exec("DELETE FROM echos WHERE hash = ?", hash)
+	_, err := d.Exec("DELETE FROM echos WHERE hash = ?", hash)
 	if err != nil {
 		return err
 	}
@@ -109,9 +133,133 @@ func (d *EchoDatabase) Delete(hash string) error {
 }
 
 func (d *EchoDatabase) SetExtension(hash, extension string) error {
-	_, err := database.Exec("UPDATE echos SET extension = ? WHERE hash = ?", extension, hash)
+	_, err := d.Exec("UPDATE echos SET extension = ? WHERE hash = ?", extension, hash)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (d *EchoDatabase) SetSize(hash string, size int64) error {
+	_, err := d.Exec("UPDATE echos SET size = ? WHERE hash = ?", size, hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *EchoDatabase) Verify() error {
+	var total int64
+
+	err := d.QueryRow("SELECT COUNT(id) FROM echos").Scan(&total)
+	if err != nil {
+		return err
+	}
+
+	if total == 0 {
+		return nil
+	}
+
+	var (
+		wg        sync.WaitGroup
+		echos     []Echo
+		completed atomic.Uint32
+		offset    int
+
+		done = make(chan bool)
+	)
+
+	log.Printf("Verifying 0%% (0 of %d)\n", total)
+
+	ticker := time.NewTicker(time.Second)
+
+	defer ticker.Stop()
+
+	wg.Go(func() {
+		totalF := float64(total)
+
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				current := completed.Load()
+				percentage := float64(current) / totalF * 100
+
+				log.Printf("Verifying %.1f%% (%d of %d)\n", percentage, current, total)
+			}
+		}
+	})
+
+	invalid := make([]any, 0)
+
+	for {
+		echos, err = d.FindAll(offset, VerifyChunkSize)
+		if err != nil {
+			break
+		}
+
+		for _, echo := range echos {
+			path := echo.Storage()
+
+			stat, err := os.Stat(path)
+			if err != nil {
+				if os.IsNotExist(err) {
+					invalid = append(invalid, echo.Hash)
+				} else {
+					log.Warnf("%s: %v\n", path, err)
+				}
+			} else {
+				size := stat.Size()
+
+				if echo.Size != size {
+					echo.Size = size
+
+					szErr := d.SetSize(echo.Hash, size)
+					if szErr != nil {
+						log.Warnf("Failed to update size (%s): %v\n", echo.Hash, szErr)
+					}
+				}
+			}
+
+			completed.Add(1)
+		}
+
+		if len(echos) < VerifyChunkSize {
+			break
+		}
+
+		offset += VerifyChunkSize
+	}
+
+	close(done)
+
+	wg.Wait()
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Verifying 100%% (%d of %d)\n", total, total)
+
+	if len(invalid) > 0 {
+		if config.Server.DeleteOrphans {
+			log.Printf("Deleting %d orphan echos...\n", len(invalid))
+
+			placeholders := strings.Repeat("?,", len(invalid))
+			placeholders = placeholders[:len(placeholders)-1]
+
+			_, err := d.Exec(fmt.Sprintf("DELETE FROM echos WHERE hash IN (%s)", placeholders), invalid...)
+			if err != nil {
+				return err
+			}
+
+			log.Println("Completed")
+		} else {
+			log.Warnf("%d echos are orphaned\n", len(invalid))
+		}
 	}
 
 	return nil
