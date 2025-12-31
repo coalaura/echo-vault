@@ -146,6 +146,7 @@ header {
 }
 
 #total-size,
+#total-count,
 .version-tag {
 	font-family: var(--font-mono);
 	color: var(--text-muted);
@@ -154,12 +155,14 @@ header {
 	font-weight: 400;
 }
 
-#total-size {
+#total-size,
+#total-count {
 	position: relative;
 	padding-left: 1.1rem;
 }
 
-#total-size::before {
+#total-size::before,
+#total-count::before {
 	content: "";
 	background: var(--text-muted);
 	height: 0.1rem;

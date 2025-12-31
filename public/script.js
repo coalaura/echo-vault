@@ -26,7 +26,8 @@
 		hasMore = true,
 		dragCounter = 0,
 		echoCache = new Map(),
-		totalSize = 0;
+		totalSize = 0,
+		totalCount = 0;
 
 	let $notifyArea;
 
@@ -97,6 +98,11 @@
 		} else {
 			$dashboardView.classList.remove("hidden");
 		}
+	}
+
+	function updateTotalSize() {
+		$totalSize.textContent = formatBytes(totalSize);
+		$totalCount.textContent = totalCount.toLocaleString();
 	}
 
 	async function fetchVersion() {
@@ -207,8 +213,9 @@
 				$emptyState.classList.add("hidden");
 
 				totalSize = data.size || 0;
+				totalCount = data.count || 0;
 
-				$totalSize.textContent = formatBytes(totalSize);
+				updateTotalSize();
 
 				renderItems(data.echos, false);
 
@@ -361,8 +368,9 @@
 			}
 
 			totalSize += newEcho.size;
+			totalCount++;
 
-			$totalSize.textContent = formatBytes(totalSize);
+			updateTotalSize();
 
 			$emptyState.classList.add("hidden");
 
@@ -405,8 +413,9 @@
 
 			if (echo) {
 				totalSize -= echo.size;
+				totalCount--;
 
-				$totalSize.textContent = formatBytes(totalSize);
+				updateTotalSize();
 
 				echoCache.delete(hash);
 			}
