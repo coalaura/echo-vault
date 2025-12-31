@@ -63,6 +63,33 @@
 		return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 	}
 
+	function formatBytesFull(bytes) {
+		if (bytes === 0) {
+			return "0 B";
+		}
+
+		const k = 1000,
+			sizes = ["B", "kB", "MB", "GB", "TB"];
+
+		const parts = [];
+
+		for (let x = sizes.length - 1; x >= 0; x--) {
+			const mult = Math.pow(k, x);
+
+			if (bytes < mult) {
+				continue;
+			}
+
+			const amount = Math.floor(bytes / mult);
+
+			bytes -= amount * mult;
+
+			parts.push(`${amount} ${sizes[x]}`);
+		}
+
+		return parts.join(" ");
+	}
+
 	function formatDate(timestamp) {
 		if (!timestamp) {
 			return "";
@@ -103,6 +130,8 @@
 
 	function updateTotalSize() {
 		$totalSize.textContent = formatBytes(totalSize);
+		$totalSize.title = formatBytesFull(totalSize);
+
 		$totalCount.textContent = totalCount.toLocaleString();
 	}
 
