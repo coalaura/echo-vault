@@ -243,8 +243,6 @@ header {
 	gap: 0.25rem;
 	opacity: 0;
 	transition: opacity 0.2s;
-	height: 100%;
-	align-items: end;
 }
 
 .echo-card:hover .echo-actions {
@@ -287,6 +285,8 @@ header {
 	background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
 	display: flex;
 	justify-content: space-between;
+	align-items: end;
+	height: 100%;
 	font-family: var(--font-mono);
 	font-size: 0.7rem;
 	color: var(--text-muted);
