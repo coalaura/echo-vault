@@ -150,16 +150,16 @@ func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	return nil
 }
 
-func (d *EchoDatabase) Verify() (uint64, error) {
+func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 	var total int64
 
 	err := d.QueryRow("SELECT COUNT(id) FROM echos").Scan(&total)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	if total == 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	var (
@@ -242,7 +242,7 @@ func (d *EchoDatabase) Verify() (uint64, error) {
 	wg.Wait()
 
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	log.Printf("Verifying 100%% (%d of %d)\n", total, total)
@@ -256,7 +256,7 @@ func (d *EchoDatabase) Verify() (uint64, error) {
 
 			_, err := d.Exec(fmt.Sprintf("DELETE FROM echos WHERE hash IN (%s)", placeholders), invalid...)
 			if err != nil {
-				return 0, err
+				return 0, 0, err
 			}
 
 			log.Println("Completed")
@@ -265,5 +265,5 @@ func (d *EchoDatabase) Verify() (uint64, error) {
 		}
 	}
 
-	return totalSize, nil
+	return totalSize, uint64(total), nil
 }

@@ -19,6 +19,7 @@ var (
 	config   *EchoConfig
 	database *EchoDatabase
 	usage    atomic.Uint64
+	count    atomic.Uint64
 
 	//go:embed public/*
 	publicFs embed.FS
@@ -45,10 +46,11 @@ func main() {
 	database, err = ConnectToDatabase()
 	log.MustFail(err)
 
-	size, err := database.Verify()
+	size, total, err := database.Verify()
 	log.MustFail(err)
 
 	usage.Add(size)
+	count.Add(total)
 
 	handleTasks()
 
