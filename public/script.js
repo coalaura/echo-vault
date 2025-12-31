@@ -16,6 +16,7 @@
 		$uploadBtn = document.getElementById("upload-trigger"),
 		$logoutBtn = document.getElementById("logout-btn"),
 		$totalSize = document.getElementById("total-size"),
+		$totalCount = document.getElementById("total-count"),
 		$versionTags = document.querySelectorAll(".version-tag"),
 		$modalContent = document.querySelector(".modal-content"),
 		$modalBackdrop = document.querySelector(".modal-backdrop");
