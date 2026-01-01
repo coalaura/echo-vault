@@ -22,6 +22,29 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 'lts/*'
+
+    - name: Minify and cache-bust assets
+      run: |
+        npm install -g esbuild
+
+        esbuild public/style.css --minify --outfile=public/style.min.css
+        esbuild public/script.js --minify --outfile=public/script.min.js
+
+        CSS_HASH=$(sha256sum public/style.min.css | cut -c1-8)
+        JS_HASH=$(sha256sum public/script.min.js | cut -c1-8)
+
+        mv public/style.min.css "public/style.${CSS_HASH}.css"
+        mv public/script.min.js "public/script.${JS_HASH}.js"
+
+        sed -i "s/style\.css/style.${CSS_HASH}.css/g" public/index.html
+        sed -i "s/script\.js/script.${JS_HASH}.js/g" public/index.html
+
+        rm public/style.css public/script.js
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
