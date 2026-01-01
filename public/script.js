@@ -1,5 +1,6 @@
 (() => {
 	const StorageKey = "echo_vault_token",
+		VolumeKey = "echo_vault_volume",
 		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"];
 
 	const $loginView = document.getElementById("login-view"),
@@ -22,6 +23,7 @@
 		$modalBackdrop = document.querySelector(".modal-backdrop");
 
 	let authToken = localStorage.getItem(StorageKey),
+		globalVolume = parseFloat(localStorage.getItem(VolumeKey)),
 		currentPage = 1,
 		isLoading = false,
 		hasMore = true,
@@ -29,6 +31,10 @@
 		echoCache = new Map(),
 		totalSize = 0,
 		totalCount = 0;
+
+	if (typeof globalVolume !== "number" || globalVolume < 0 || globalVolume > 1) {
+		globalVolume = 0.75;
+	}
 
 	let $notifyArea;
 
@@ -267,36 +273,86 @@
 		list.forEach(item => {
 			echoCache.set(item.hash, item);
 
-			const ext = item.ext,
+			const ext = item.extension,
 				url = item.url,
 				isVideo = VideoExtensions.includes(ext);
 
+			// Card container
 			const card = document.createElement("div");
 
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
+			// Media element
 			let media;
 
 			if (isVideo) {
-				media = `<video src="${url}" class="echo-media" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>`;
+				media = document.createElement("video");
+
+				media.src = url;
+				media.className = "echo-media";
+				media.muted = true;
+				media.loop = true;
+
+				media.addEventListener("mouseover", () => media.play());
+				media.addEventListener("mouseout", () => media.pause());
 			} else {
-				media = `<img src="${url}" class="echo-media" loading="lazy">`;
+				media = document.createElement("img");
+
+				media.src = url;
+				media.className = "echo-media";
+				media.loading = "lazy";
 			}
 
-			const link = `<a href="${url}" target="_blank" class="echo-link">${media}</a>`;
+			const link = document.createElement("a");
 
-			card.innerHTML = `
-                ${link}
-                <div class="echo-actions">
-                    <button class="action-btn" data-action="copy" data-hash="${item.hash}">COPY</button>
-                    <button class="action-btn delete" data-action="delete" data-hash="${item.hash}">DEL</button>
-                </div>
-				<div class="echo-info">
-					<span>${formatDate(item.timestamp)}</span>
-					<span>${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}</span>
-				</div>
-            `;
+			link.href = url;
+			link.target = "_blank";
+			link.className = "echo-link";
+
+			link.appendChild(media);
+
+			// Actions container
+			const actions = document.createElement("div");
+
+			actions.className = "echo-actions";
+
+			const copyBtn = document.createElement("button");
+
+			copyBtn.className = "action-btn";
+
+			copyBtn.dataset.action = "copy";
+			copyBtn.dataset.hash = item.hash;
+
+			copyBtn.textContent = "COPY";
+
+			const deleteBtn = document.createElement("button");
+
+			deleteBtn.className = "action-btn delete";
+			deleteBtn.dataset.action = "delete";
+			deleteBtn.dataset.hash = item.hash;
+
+			deleteBtn.textContent = "DEL";
+
+			actions.append(copyBtn, deleteBtn);
+
+			// Info container
+			const info = document.createElement("div");
+
+			info.className = "echo-info";
+
+			const dateSpan = document.createElement("span");
+
+			dateSpan.textContent = formatDate(item.timestamp);
+
+			const sizeSpan = document.createElement("span");
+
+			sizeSpan.textContent = `${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}`;
+
+			info.append(dateSpan, sizeSpan);
+
+			// Assemble card
+			card.append(link, actions, info);
 
 			fragment.appendChild(card);
 		});
@@ -315,7 +371,7 @@
 			return;
 		}
 
-		const ext = item.ext,
+		const ext = item.extension,
 			url = item.url,
 			isVideo = VideoExtensions.includes(ext);
 
@@ -325,8 +381,13 @@
 			const vid = document.createElement("video");
 
 			vid.src = url;
+			vid.volume = globalVolume;
 			vid.controls = true;
 			vid.autoplay = true;
+
+			vid.addEventListener("volumechange", () => {
+				localStorage.setItem(VolumeKey, vid.volume);
+			});
 
 			$modalContent.appendChild(vid);
 		} else {
