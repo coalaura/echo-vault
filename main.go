@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"io/fs"
 	"net/http"
+	"os"
 	"sync/atomic"
 
 	"github.com/coalaura/plain"
@@ -32,7 +33,7 @@ func main() {
 	err := EnsureStorage()
 	log.MustFail(err)
 
-	public, err := fs.Sub(publicFs, "public")
+	public, err := getPublicFS()
 	log.MustFail(err)
 
 	log.Println("Loading config...")
@@ -81,4 +82,12 @@ func main() {
 
 	log.Printf("Listening at http://localhost%s/\n", addr)
 	http.ListenAndServe(addr, r)
+}
+
+func getPublicFS() (fs.FS, error) {
+	if Version == "dev" {
+		return os.DirFS("public"), nil
+	}
+
+	return fs.Sub(publicFs, "public")
 }
