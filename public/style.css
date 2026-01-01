@@ -424,9 +424,6 @@ header {
 	position: fixed;
 	inset: 0;
 	z-index: 100;
-	background: rgba(17, 17, 17, 0.95);
-	border: 3px dashed var(--text-muted);
-	margin: 1.5rem;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -434,6 +431,16 @@ header {
 	font-family: var(--font-mono);
 	font-size: 1.5rem;
 	pointer-events: auto;
+	background: rgba(17, 17, 17, 0.95);
+	backdrop-filter: blur(8px);
+}
+
+#drop-overlay::before {
+	content: "";
+	position: absolute;
+	inset: 1.5rem;
+	z-index: -1;
+	border: 3px dashed var(--text-muted);
 }
 
 #notification-area {
