@@ -360,15 +360,16 @@
 				media.addEventListener("loadeddata", () => {
 					badge.textContent = formatDuration(media.duration);
 
-					console.log(media);
-
 					onLoad();
 				});
 
 				media.addEventListener("error", onError);
 
-				media.addEventListener("mouseover", () => media.play());
-				media.addEventListener("mouseout", () => {
+				card.addEventListener("mouseenter", () => {
+					media.play();
+				});
+
+				card.addEventListener("mouseleave", () => {
 					media.pause();
 					media.currentTime = 0;
 				});
@@ -554,8 +555,8 @@
 		}
 	}
 
-	async function deleteEcho(hash) {
-		if (!confirm("Delete this echo?")) {
+	async function deleteEcho(hash, noConfirm = false) {
+		if (!noConfirm && !confirm("Delete this echo?")) {
 			return;
 		}
 
@@ -623,7 +624,7 @@
 				if (action === "copy") {
 					copyLink(hash, btn);
 				} else if (action === "delete") {
-					deleteEcho(hash);
+					deleteEcho(hash, event.shiftKey);
 				}
 
 				return;
