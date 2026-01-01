@@ -32,7 +32,7 @@
 		totalSize = 0,
 		totalCount = 0;
 
-	if (typeof globalVolume !== "number" || globalVolume < 0 || globalVolume > 1) {
+	if (typeof globalVolume !== "number" || !Number.isFinite(globalVolume) || globalVolume < 0 || globalVolume > 1) {
 		globalVolume = 0.75;
 	}
 
