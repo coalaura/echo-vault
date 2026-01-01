@@ -98,7 +98,14 @@ To support the Web UI, Nginx should proxy requests to the backend. You can still
 location /i/ {
     alias /path/to/your/storage/;
 
+    etag on;
     expires 30d;
+
+    location ~* \.(mp4|webm|mov|mkv|m4v)$ {
+        add_header Accept-Ranges bytes always;
+
+        output_buffers 2 1m;
+    }
 }
 
 # Proxy UI and API
