@@ -106,11 +106,28 @@
 		return date.toISOString().split("T")[0];
 	}
 
+	function formatDuration(seconds) {
+		if (!Number.isFinite(seconds) || seconds <= 0) {
+			return "0s";
+		}
+
+		seconds = Math.floor(seconds);
+
+		const m = Math.floor(seconds / 60),
+			s = seconds % 60;
+
+		if (m > 0) {
+			return `${m}m${s}s`;
+		}
+
+		return `${s}s`;
+	}
+
 	function showNotification(message, type = "info") {
 		const toast = document.createElement("div");
 
 		toast.className = `notification ${type}`;
-		toast.innerText = message;
+		toast.textContent = message;
 
 		$notifyArea.appendChild(toast);
 
@@ -151,7 +168,7 @@
 			}
 
 			$versionTags.forEach(tag => {
-				tag.innerText = data.version;
+				tag.textContent = data.version;
 			});
 		} catch (err) {
 			console.error(`Failed to fetch version: ${err}`);
@@ -283,32 +300,91 @@
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
+			// Link container
+			const link = document.createElement("a");
+
+			link.href = url;
+			link.target = "_blank";
+			link.className = "echo-link";
+
+			// Loader
+			const loader = document.createElement("div");
+			loader.className = "media-loader";
+
+			const spinner = document.createElement("span");
+			spinner.className = "spinner";
+			loader.appendChild(spinner);
+
+			link.appendChild(loader);
+
+			const onLoad = () => {
+				if (loader.parentNode) {
+					loader.remove();
+				}
+
+				media.classList.add("loaded");
+			};
+
+			const onError = () => {
+				if (loader.parentNode) {
+					loader.remove();
+				}
+
+				const errorState = document.createElement("div");
+
+				errorState.className = "media-error";
+
+				errorState.textContent = "FAILED";
+
+				link.appendChild(errorState);
+			};
+
 			// Media element
 			let media;
 
 			if (isVideo) {
 				media = document.createElement("video");
 
-				media.src = url;
 				media.className = "echo-media";
 				media.muted = true;
 				media.loop = true;
 
+				// Video Badge
+				const badge = document.createElement("div");
+
+				badge.className = "type-badge";
+				badge.textContent = "▶";
+
+				card.appendChild(badge);
+
+				media.addEventListener("loadeddata", () => {
+					badge.textContent = formatDuration(media.duration);
+
+					console.log(media);
+
+					onLoad();
+				});
+
+				media.addEventListener("error", onError);
+
 				media.addEventListener("mouseover", () => media.play());
-				media.addEventListener("mouseout", () => media.pause());
+				media.addEventListener("mouseout", () => {
+					media.pause();
+					media.currentTime = 0;
+				});
+
+				media.src = url;
 			} else {
 				media = document.createElement("img");
 
-				media.src = url;
 				media.className = "echo-media";
 				media.loading = "lazy";
+
+				media.addEventListener("load", onLoad);
+				media.addEventListener("error", onError);
+
+				media.src = url;
 			}
-
-			const link = document.createElement("a");
-
-			link.href = url;
-			link.target = "_blank";
-			link.className = "echo-link";
 
 			link.appendChild(media);
 
@@ -419,12 +495,12 @@
 			await navigator.clipboard.writeText(url);
 
 			if (btnElement) {
-				const originalText = btnElement.innerText;
+				const originalText = btnElement.textContent;
 
-				btnElement.innerText = "COPIED";
+				btnElement.textContent = "COPIED";
 
 				setTimeout(() => {
-					btnElement.innerText = originalText;
+					btnElement.textContent = originalText;
 				}, 1000);
 			}
 		} catch {
@@ -437,7 +513,7 @@
 
 		formData.append("upload", file);
 
-		$uploadBtn.innerText = "UPLOADING...";
+		$uploadBtn.textContent = "UPLOADING...";
 		$uploadBtn.disabled = true;
 
 		try {
@@ -471,7 +547,7 @@
 		} catch (err) {
 			showNotification(err.message, "error");
 		} finally {
-			$uploadBtn.innerText = "UPLOAD_FILE";
+			$uploadBtn.textContent = "UPLOAD_FILE";
 			$uploadBtn.disabled = false;
 
 			$fileInput.value = "";

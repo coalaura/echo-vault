@@ -238,6 +238,50 @@ header {
 	background: var(--surface-hover);
 }
 
+.media-loader,
+.media-error {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--surface);
+	z-index: 0;
+}
+
+.media-error {
+	color: var(--danger);
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	letter-spacing: 0.1em;
+	font-weight: 700;
+}
+
+.media-loader .spinner {
+	width: 1.5rem;
+	height: 1.5rem;
+	border-width: 2px;
+}
+
+.type-badge {
+	position: absolute;
+	top: 0.5rem;
+	left: 0.5rem;
+	background: rgba(0, 0, 0, 0.7);
+	backdrop-filter: blur(2px);
+	color: var(--text-main);
+	border: 1px solid var(--border);
+	padding: 0.15rem 0.4rem;
+	font-size: 0.65rem;
+	font-family: var(--font-mono);
+	font-weight: 700;
+	border-radius: 2px;
+	z-index: 10;
+	pointer-events: none;
+	letter-spacing: 0.05em;
+	user-select: none;
+}
+
 .echo-actions {
 	position: absolute;
 	top: 0.5rem;
