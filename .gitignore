@@ -1,4 +1,6 @@
 echo.db
+echo.db-shm
+echo.db-wal
 storage
 backups
 tags

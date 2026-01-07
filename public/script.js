@@ -325,6 +325,10 @@
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
+			if (item.tag?.safety === "sensitive") {
+				card.classList.add("sensitive");
+			}
+
 			// Link container
 			const link = document.createElement("a");
 

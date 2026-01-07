@@ -281,6 +281,43 @@ header {
 	background: var(--surface-hover);
 }
 
+.echo-card.sensitive .echo-media {
+	filter: blur(20px) grayscale(0.5);
+	transform: scale(1.1);
+	transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.echo-card.sensitive:hover .echo-media {
+	filter: blur(0) grayscale(0);
+	transform: scale(1);
+}
+
+.echo-card.sensitive .echo-link::after {
+	content: "SENSITIVE_CONTENT";
+	position: absolute;
+	inset: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background: rgba(0, 0, 0, 0.4);
+	font-family: var(--font-mono);
+	font-weight: 700;
+	letter-spacing: 0.1em;
+	font-size: 0.9rem;
+	color: var(--text-main);
+	border: 1px solid var(--border);
+	margin: 1rem;
+	backdrop-filter: blur(4px);
+	opacity: 1;
+	transition: opacity 0.3s ease, transform 0.3s ease;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.echo-card.sensitive:hover .echo-link::after {
+	opacity: 0;
+}
+
 .media-loader,
 .media-error {
 	position: absolute;
@@ -298,12 +335,6 @@ header {
 	font-size: 0.8rem;
 	letter-spacing: 0.1em;
 	font-weight: 700;
-}
-
-.media-loader .spinner {
-	width: 1.5rem;
-	height: 1.5rem;
-	border-width: 2px;
 }
 
 .echo-similarity,
@@ -462,6 +493,12 @@ header {
 	animation: spin 0.8s linear infinite;
 	margin-right: 10px;
 	vertical-align: middle;
+}
+
+.media-loader .spinner {
+	width: 1.5rem;
+	height: 1.5rem;
+	border-width: 2px;
 }
 
 #drop-overlay {
