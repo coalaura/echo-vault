@@ -94,9 +94,9 @@ var (
 	}
 )
 
-func (e *Echo) GenerateTags(noLogs bool) {
+func (e *Echo) GenerateTags(noLogs bool) float64 {
 	if config.AI.OpenRouterToken == "" || !e.IsImage() {
-		return
+		return 0
 	}
 
 	if !noLogs {
@@ -107,7 +107,7 @@ func (e *Echo) GenerateTags(noLogs bool) {
 	if err != nil {
 		log.Warnf("[%s] Failed to read echo as jpeg: %v\n", e.Hash, err)
 
-		return
+		return 0
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -135,13 +135,22 @@ func (e *Echo) GenerateTags(noLogs bool) {
 				Strict: true,
 			},
 		},
+		Usage: &openrouter.IncludeUsage{
+			Include: true,
+		},
 	}
 
 	completion, err := client.CreateChatCompletion(ctx, request)
 	if err != nil {
 		log.Warnf("[%s] Tag completion failed: %v\n", e.Hash, err)
 
-		return
+		return 0
+	}
+
+	var cost float64
+
+	if completion.Usage != nil {
+		cost = completion.Usage.Cost
 	}
 
 	choices := completion.Choices
@@ -149,7 +158,7 @@ func (e *Echo) GenerateTags(noLogs bool) {
 	if len(choices) == 0 {
 		log.Warnf("[%s] Tag completion returned no choices\n", e.Hash)
 
-		return
+		return cost
 	}
 
 	content := choices[0].Message.Content.Text
@@ -157,7 +166,7 @@ func (e *Echo) GenerateTags(noLogs bool) {
 	if len(content) == 0 {
 		log.Warnf("[%s] Tag completion returned no content", e.Hash)
 
-		return
+		return cost
 	}
 
 	var result EchoTag
@@ -166,33 +175,35 @@ func (e *Echo) GenerateTags(noLogs bool) {
 	if err != nil {
 		log.Warnf("[%s] Tag completion returned bad json: %v\n", e.Hash, err)
 
-		return
+		return cost
 	}
 
 	err = result.Clean()
 	if err != nil {
 		log.Warnf("[%s] Tag completion invalid: %v\n", e.Hash, err)
 
-		return
+		return cost
 	}
 
 	err = vector.Store(e.Hash, result)
 	if err != nil {
 		log.Warnf("[%s] Tag completion invalid: %v\n", e.Hash, err)
 
-		return
+		return cost
 	}
 
 	err = database.SetTags(e.Hash, result)
 	if err != nil {
 		log.Warnf("[%s] Failed to store tags: %v\n", e.Hash, err)
 
-		return
+		return cost
 	}
 
 	if !noLogs {
 		log.Debugf("[%s] Tagging completed\n", e.Hash)
 	}
+
+	return cost
 }
 
 func (e *Echo) ReadAsJpegBase64() (string, error) {
