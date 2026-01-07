@@ -285,12 +285,13 @@ header {
 	filter: blur(20px) grayscale(0.5);
 	transform: scale(1.1);
 	transition: filter 0.3s ease, transform 0.3s ease;
-	transition-delay: 1.5s;
+	transition-delay: 0s;
 }
 
 .echo-card.blurred:hover .echo-media {
 	filter: blur(0) grayscale(0);
 	transform: scale(1);
+	transition-delay: 500ms;
 }
 
 .echo-card.blurred .echo-link::after {
@@ -311,7 +312,6 @@ header {
 	backdrop-filter: blur(4px);
 	opacity: 1;
 	transition: opacity 0.3s ease, transform 0.3s ease;
-	transition-delay: 1s;
 	pointer-events: none;
 	z-index: 5;
 }
