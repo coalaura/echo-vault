@@ -28,8 +28,8 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(4)
-	db.SetMaxIdleConns(4)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 
 	b := NewTableBuilder(db, "echos")
 
