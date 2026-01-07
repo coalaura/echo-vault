@@ -19,6 +19,9 @@ func RunBackfill(total uint64) {
 		completed atomic.Uint64
 		offset    int
 
+		totalCostMx sync.RWMutex
+		totalCost   float64
+
 		workers = min(8, max(4, runtime.NumCPU()))
 		queue   = NewQueue(workers)
 		done    = make(chan bool)
@@ -48,7 +51,11 @@ func RunBackfill(total uint64) {
 
 				percentage := float64(current) / totalF * 100
 
-				log.Printf("Verifying tags %.1f%% (%d of %d)\n", percentage, current, total)
+				totalCostMx.RLock()
+				cost := totalCost
+				totalCostMx.RUnlock()
+
+				log.Printf("Verifying tags %.1f%% (%d of %d, $%f)\n", percentage, current, total, cost)
 
 				last = current
 			}
@@ -71,7 +78,12 @@ func RunBackfill(total uint64) {
 			queue.Work(func() error {
 				defer completed.Add(1)
 
-				echo.GenerateTags(true)
+				cost := echo.GenerateTags(true)
+				if cost > 0 {
+					totalCostMx.Lock()
+					totalCost += cost
+					totalCostMx.Unlock()
+				}
 
 				return nil
 			})
