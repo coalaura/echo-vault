@@ -61,7 +61,7 @@ func RunBackfill(total uint64) {
 		}
 
 		for _, echo := range echos {
-			if !echo.IsImage() || echo.Tag.Safety != "" {
+			if !echo.IsImage() || (echo.Tag.Safety != "" && vector.Has(echo.Hash)) {
 				completed.Add(1)
 
 				continue
