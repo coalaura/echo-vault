@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"sync"
 
 	"github.com/philippgille/chromem-go"
 )
 
 type VectorStore struct {
-	mx         sync.RWMutex
 	db         *chromem.DB
 	collection *chromem.Collection
 }
@@ -48,9 +46,6 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 		return nil, nil
 	}
 
-	s.mx.RLock()
-	defer s.mx.RUnlock()
-
 	results, err := s.collection.Query(ctx, query, amount, nil, nil)
 	if err != nil {
 		return nil, err
@@ -75,13 +70,17 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 }
 
 func (s *VectorStore) Store(hash string, entry EchoTag) error {
-	s.mx.Lock()
-	defer s.mx.Unlock()
-
 	document := chromem.Document{
 		ID:      hash,
 		Content: entry.EmbeddingString(),
 	}
 
 	return s.collection.AddDocument(context.Background(), document)
+}
+
+func (s *VectorStore) Has(hash string) bool {
+	// only errors are "not found" or "no id passed"
+	_, err := s.collection.GetByID(context.Background(), hash)
+
+	return err == nil
 }
