@@ -49,6 +49,14 @@ type EchoConfigGIFs struct {
 	MaxWidth     int  `yaml:"max_width"`
 }
 
+type EchoConfigAI struct {
+	OpenRouterToken string `yaml:"openrouter_token"`
+	TaggingModel    string `yaml:"tagging_model"`
+	EmbeddingModel  string `yaml:"embedding_model"`
+	MinSimilarity   int    `yaml:"min_similarity"`
+	ReTagEmpty      bool   `yaml:"re_tag_empty"`
+}
+
 type EchoConfig struct {
 	ffmpeg   string
 	ffprobe  string
@@ -59,6 +67,7 @@ type EchoConfig struct {
 	Images EchoConfigImages `yaml:"images"`
 	Videos EchoConfigVideos `yaml:"videos"`
 	GIFs   EchoConfigGIFs   `yaml:"gifs"`
+	AI     EchoConfigAI     `yaml:"ai"`
 }
 
 func NewDefaultConfig() EchoConfig {
@@ -96,6 +105,13 @@ func NewDefaultConfig() EchoConfig {
 			MaxColors:    256,
 			MaxFramerate: 15,
 			MaxWidth:     480,
+		},
+		AI: EchoConfigAI{
+			OpenRouterToken: "",
+			TaggingModel:    "google/gemma-3-27b-it",
+			EmbeddingModel:  "openai/text-embedding-3-small",
+			MinSimilarity:   25,
+			ReTagEmpty:      false,
 		},
 	}
 }
@@ -199,6 +215,21 @@ func (c *EchoConfig) Validate() error {
 		return fmt.Errorf("gifs.max_width must be 1-1024, got %d", c.GIFs.MaxWidth)
 	}
 
+	// ai
+	if c.AI.OpenRouterToken != "" {
+		if c.AI.TaggingModel == "" {
+			return errors.New("ai.tagging_model must be set")
+		}
+
+		if c.AI.EmbeddingModel == "" {
+			return errors.New("ai.embedding_model must be set")
+		}
+
+		if c.AI.MinSimilarity < 0 || c.AI.MinSimilarity > 100 {
+			return fmt.Errorf("ai.min_similarity must be 0-100, got %d", c.AI.MinSimilarity)
+		}
+	}
+
 	// check ffmpeg dependency
 	if c.Videos.Enabled || c.GIFs.Enabled {
 		ffmpeg, err := exec.LookPath("ffmpeg")
@@ -271,6 +302,12 @@ func (e *EchoConfig) Store() error {
 		"$.gifs.max_colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.MaxColors))},
 		"$.gifs.max_framerate": {yaml.HeadComment(fmt.Sprintf(" maximum fps (1 - 30; default: %v)", def.GIFs.MaxFramerate))},
 		"$.gifs.max_width":     {yaml.HeadComment(fmt.Sprintf(" maximum width/height (1 - 1024; default: %v)", def.GIFs.MaxWidth))},
+
+		"$.ai.openrouter_token": {yaml.HeadComment(fmt.Sprintf(" openrouter token for image tagging (if empty, disables image tagging; default: %v)", def.AI.OpenRouterToken))},
+		"$.ai.tagging_model":    {yaml.HeadComment(fmt.Sprintf(" model used for image tagging (requires vision and structured output support; default: %v)", def.AI.TaggingModel))},
+		"$.ai.embedding_model":  {yaml.HeadComment(fmt.Sprintf(" model used for embedding (requires embedding support; default: %v)", def.AI.EmbeddingModel))},
+		"$.ai.min_similarity":   {yaml.HeadComment(fmt.Sprintf(" minimum similarity percentage (0-100) for results to be included (default: %v)", def.AI.MinSimilarity))},
+		"$.ai.re_tag_empty":     {yaml.HeadComment(fmt.Sprintf(" if echos without tags should be re-tagged (default: %v)", def.AI.ReTagEmpty))},
 	}
 
 	file, err := OpenFileForWriting("config.yml")

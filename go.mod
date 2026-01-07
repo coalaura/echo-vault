@@ -7,6 +7,9 @@ require (
 	github.com/gen2brain/webp v0.5.5
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/goccy/go-yaml v1.19.1
+	github.com/mozillazg/go-unidecode v0.2.0
+	github.com/philippgille/chromem-go v0.7.0
+	github.com/revrost/go-openrouter v1.1.5
 )
 
 require (

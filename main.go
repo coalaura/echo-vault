@@ -18,6 +18,7 @@ var Version = "dev"
 var (
 	config   *EchoConfig
 	database *EchoDatabase
+	vector   *VectorStore
 	usage    atomic.Uint64
 	count    atomic.Uint64
 
@@ -41,10 +42,17 @@ func main() {
 	config, err = LoadConfig()
 	log.MustFail(err)
 
+	log.Println("Loading vector store...")
+
+	vector, err = LoadVectorStore()
+	log.MustFail(err)
+
 	log.Println("Connecting to database...")
 
 	database, err = ConnectToDatabase()
 	log.MustFail(err)
+
+	defer database.Close()
 
 	size, total, err := database.Verify()
 	log.MustFail(err)
@@ -73,6 +81,7 @@ func main() {
 
 		gr.Post("/upload", uploadHandler)
 		gr.Get("/echos/{page}", listEchosHandler)
+		gr.Get("/query/{page}", queryEchosHandler)
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 
