@@ -53,6 +53,10 @@ func (b *BackupList) Next() (time.Duration, time.Time) {
 
 	next := newest.Add(time.Duration(config.Backup.Interval) * time.Hour)
 
+	if next.Before(now) {
+		return 0, now
+	}
+
 	return next.Sub(now), next
 }
 
