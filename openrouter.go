@@ -271,8 +271,8 @@ func (t *EchoTag) Clean() error {
 
 		if len(text) < 1 {
 			return fmt.Errorf("text %d empty", i+1)
-		} else if len(text) > 128 {
-			return fmt.Errorf("text %d too long: %d", i+1, len(text))
+		} else if len(text) > 196 {
+			text = text[:196]
 		}
 
 		t.Text[i] = unidecode.Unidecode(text)
