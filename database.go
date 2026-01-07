@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,13 +39,24 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	}
 
 	err = b.AddColumns([]SQLiteColumn{
-		{"hash", "TEXT NOT NULL UNIQUE"},
+		{"hash", "TEXT NOT NULL"},
 		{"name", "TEXT NOT NULL"},
 		{"extension", "TEXT NOT NULL"},
 		{"size", "INTEGER NOT NULL DEFAULT 0"},
 		{"upload_size", "INTEGER NOT NULL DEFAULT 0"},
 		{"timestamp", "INTEGER NOT NULL DEFAULT 0"},
+
+		{"categories", "TEXT NULL"},
+		{"tags", "TEXT NULL"},
+		{"caption", "TEXT NULL"},
+		{"text", "TEXT NULL"},
+		{"safety", "TEXT NULL"},
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_echos_hash ON echos(hash)")
 	if err != nil {
 		return nil, err
 	}
@@ -69,9 +81,12 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 }
 
 func (d *EchoDatabase) Find(hash string) (*Echo, error) {
-	var e Echo
+	var (
+		e      Echo
+		safety sql.NullString
+	)
 
-	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp)
+	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -80,11 +95,13 @@ func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 		return nil, err
 	}
 
+	e.Tag.Safety = safety.String
+
 	return &e, nil
 }
 
 func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
-	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +111,82 @@ func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
 	var echos []Echo
 
 	for rows.Next() {
-		var e Echo
+		var (
+			e      Echo
+			safety sql.NullString
+		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
 		if err != nil {
 			return nil, err
 		}
+
+		e.Tag.Safety = safety.String
+
+		echos = append(echos, e)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return echos, nil
+}
+
+func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
+	if len(hashes) == 0 {
+		return nil, nil
+	}
+
+	placeholders := strings.Repeat("?,", len(hashes))
+	placeholders = placeholders[:len(placeholders)-1]
+
+	var b strings.Builder
+
+	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
+	b.WriteString(placeholders)
+	b.WriteString(") ORDER BY CASE hash ")
+
+	for i := range hashes {
+		b.WriteString("WHEN ? THEN ")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteString(" ")
+	}
+
+	b.WriteString("END")
+
+	args := make([]any, 0, len(hashes)*2)
+
+	for _, hash := range hashes {
+		args = append(args, hash)
+	}
+
+	for _, hash := range hashes {
+		args = append(args, hash)
+	}
+
+	rows, err := d.Query(b.String(), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var echos []Echo
+
+	for rows.Next() {
+		var (
+			e      Echo
+			safety sql.NullString
+		)
+
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+		if err != nil {
+			return nil, err
+		}
+
+		e.Tag.Safety = safety.String
 
 		echos = append(echos, e)
 	}
@@ -146,6 +233,17 @@ func (d *EchoDatabase) SetExtension(hash, extension string) error {
 
 func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	_, err := d.Exec("UPDATE echos SET size = ? WHERE hash = ?", size, hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *EchoDatabase) SetTags(hash string, entry EchoTag) error {
+	categories, tags, caption, text, safety := entry.Serialize()
+
+	_, err := d.Exec("UPDATE echos SET categories = ?, tags = ?, caption = ?, text = ?, safety = ? WHERE hash = ?", categories, tags, caption, text, safety, hash)
 	if err != nil {
 		return err
 	}

@@ -136,6 +136,7 @@ header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	gap: 1rem;
 }
 
 .brand {
@@ -143,6 +144,7 @@ header {
 	letter-spacing: -0.025em;
 	font-size: 1.1rem;
 	white-space: nowrap;
+	flex-shrink: 0;
 }
 
 #total-size,
@@ -155,6 +157,12 @@ header {
 	font-weight: 400;
 }
 
+#total-size:empty,
+#total-count:empty,
+.version-tag:empty {
+	display: none;
+}
+
 #total-size,
 #total-count {
 	position: relative;
@@ -165,18 +173,53 @@ header {
 #total-count::before {
 	content: "";
 	background: var(--text-muted);
-	height: 0.1rem;
+	height: 1px;
 	width: 0.4rem;
 	display: block;
 	position: absolute;
 	left: 0;
-	top: 50%;
-	transform: translateY(-50%);
+	top: 0.45rem;
+}
+
+#search-wrapper {
+	flex: 1;
+	display: flex;
+	justify-content: center;
+	max-width: 600px;
+	margin: 0 1rem;
+}
+
+#search-input {
+	width: 100%;
+	background: rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--border);
+	color: var(--text-main);
+	padding: 0.5rem 1rem;
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	transition: all 0.2s ease;
+}
+
+#search-input:focus {
+	border-color: var(--text-main);
+	background: rgba(0, 0, 0, 0.6);
+	box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+#search-input:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
+#search-input::placeholder {
+	color: var(--border);
+	opacity: 0.7;
 }
 
 .actions {
 	display: flex;
 	gap: 0.75rem;
+	flex-shrink: 0;
 }
 
 #upload-trigger {
@@ -263,6 +306,7 @@ header {
 	border-width: 2px;
 }
 
+.echo-similarity,
 .type-badge {
 	position: absolute;
 	top: 0.5rem;

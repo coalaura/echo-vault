@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mozillazg/go-unidecode"
 )
 
 const PageSize = 100
@@ -18,6 +20,7 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"version": Version,
+		"queries": config.AI.OpenRouterToken != "",
 	})
 }
 
@@ -86,23 +89,14 @@ func viewEchoHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listEchosHandler(w http.ResponseWriter, r *http.Request) {
-	var page int
+	page := parsePage(r)
+	if page == -1 {
+		abort(w, http.StatusBadRequest, "invalid page number")
 
-	if raw := chi.URLParam(r, "page"); raw != "" {
-		num, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			abort(w, http.StatusBadRequest, "invalid page number")
+		log.Warnln("list: invalid page number")
 
-			log.Warnln("list: invalid page number")
-			log.Warnln(err)
-
-			return
-		}
-
-		page = int(num)
+		return
 	}
-
-	page = max(1, page)
 
 	echos, err := database.FindAll((page-1)*PageSize, PageSize)
 	if err != nil {
@@ -174,4 +168,103 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 	count.Add(^uint64(0))
 
 	okay(w)
+}
+
+func queryEchosHandler(w http.ResponseWriter, r *http.Request) {
+	if vector == nil {
+		abort(w, http.StatusServiceUnavailable, "querying is disabled")
+
+		return
+	}
+
+	page := parsePage(r)
+	if page == -1 {
+		abort(w, http.StatusBadRequest, "invalid page number")
+
+		log.Warnln("query: invalid page number")
+
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+
+	query = strings.TrimSpace(query)
+	query = unidecode.Unidecode(query)
+
+	if len(query) == 0 {
+		abort(w, http.StatusBadRequest, "missing query")
+
+		log.Warnln("query: missing query")
+
+		return
+	}
+
+	ranked, err := vector.Query(r.Context(), query, page*PageSize)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "failed search")
+
+		log.Warnln("query: failed search")
+		log.Warnln(err)
+
+		return
+	}
+
+	var echos []Echo
+
+	start := (page - 1) * PageSize
+	end := min(start+PageSize, len(ranked))
+
+	if start < end {
+		ranked = ranked[start:end]
+
+		hashes := make([]string, len(ranked))
+		scoreMap := make(map[string]float32)
+
+		for i, res := range ranked {
+			hashes[i] = res.Hash
+
+			scoreMap[res.Hash] = res.Similarity
+		}
+
+		results, err := database.FindByHashes(hashes)
+		if err != nil {
+			abort(w, http.StatusInternalServerError, "database error")
+
+			log.Warnln("query: failed to read echos")
+			log.Warnln(err)
+
+			return
+		}
+
+		for i, echo := range results {
+			if score, ok := scoreMap[echo.Hash]; ok {
+				results[i].Tag.Similarity = score
+			}
+		}
+
+		echos = results
+	}
+
+	okay(w, "application/json")
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"echos": echos,
+		"size":  usage.Load(),
+		"count": count.Load(),
+	})
+}
+
+func parsePage(r *http.Request) int {
+	var page int
+
+	if raw := chi.URLParam(r, "page"); raw != "" {
+		num, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return -1
+		}
+
+		page = int(num)
+	}
+
+	return max(1, page)
 }

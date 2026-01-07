@@ -16,6 +16,8 @@ type Echo struct {
 	Size       int64  `json:"size"`
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
+
+	Tag EchoTag `json:"tag,omitempty"`
 }
 
 type echoAlias Echo
@@ -139,4 +141,8 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 	}
 
 	return 0, fmt.Errorf("unsupported extension %q", e.Extension)
+}
+
+func (e *Echo) IsImage() bool {
+	return config.IsValidImageFormat(e.Extension)
 }

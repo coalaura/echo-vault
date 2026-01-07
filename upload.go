@@ -196,6 +196,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("store")
 
+	go echo.GenerateTags()
+
 	okay(w, "application/json")
 
 	result := map[string]any{

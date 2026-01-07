@@ -13,6 +13,8 @@
 		$emptyState = document.getElementById("empty-state"),
 		$loader = document.getElementById("loader"),
 		$dropOverlay = document.getElementById("drop-overlay"),
+		$searchWrapper = document.getElementById("search-wrapper"),
+		$searchInput = document.getElementById("search-input"),
 		$fileInput = document.getElementById("file-input"),
 		$uploadBtn = document.getElementById("upload-trigger"),
 		$logoutBtn = document.getElementById("logout-btn"),
@@ -30,11 +32,14 @@
 		dragCounter = 0,
 		echoCache = new Map(),
 		totalSize = 0,
-		totalCount = 0;
+		totalCount = 0,
+		currentQuery = "";
 
 	if (typeof globalVolume !== "number" || !Number.isFinite(globalVolume) || globalVolume < 0 || globalVolume > 1) {
 		globalVolume = 0.75;
 	}
+
+	$searchInput.value = "";
 
 	let $notifyArea;
 
@@ -45,7 +50,7 @@
 
 		document.body.appendChild($notifyArea);
 
-		fetchVersion();
+		fetchInfo();
 
 		if (authToken) {
 			verifyToken(authToken);
@@ -158,7 +163,7 @@
 		$totalCount.textContent = totalCount.toLocaleString();
 	}
 
-	async function fetchVersion() {
+	async function fetchInfo() {
 		try {
 			const response = await fetch("/info"),
 				data = await response.json();
@@ -170,6 +175,12 @@
 			$versionTags.forEach(tag => {
 				tag.textContent = data.version;
 			});
+
+			if (data.queries) {
+				searchEnabled = true;
+
+				$searchWrapper.classList.remove("hidden");
+			}
 		} catch (err) {
 			console.error(`Failed to fetch version: ${err}`);
 		}
@@ -201,6 +212,8 @@
 		authToken = null;
 		currentPage = 1;
 		hasMore = true;
+		currentQuery = "";
+		$searchInput.value = "";
 		echoCache.clear();
 
 		localStorage.removeItem(StorageKey);
@@ -243,10 +256,20 @@
 
 		isLoading = true;
 
+		$searchInput.setAttribute("disabled", true);
+
 		$loader.classList.remove("hidden");
 
 		try {
-			const response = await fetchWithAuth(`/echos/${currentPage}`);
+			let endpoint;
+
+			if (currentQuery) {
+				endpoint = `/query/${currentPage}?q=${encodeURIComponent(currentQuery)}`;
+			} else {
+				endpoint = `/echos/${currentPage}`;
+			}
+
+			const response = await fetchWithAuth(endpoint);
 
 			if (!response.ok) {
 				const msg = await parseResponseError(response);
@@ -278,6 +301,8 @@
 			showNotification(error.message, "error");
 		} finally {
 			isLoading = false;
+
+			$searchInput.removeAttribute("disabled");
 
 			$loader.classList.add("hidden");
 		}
@@ -389,6 +414,20 @@
 
 			link.appendChild(media);
 
+			card.appendChild(link);
+
+			// Similarity
+			if (item.tag?.similarity) {
+				const similarity = document.createElement("div"),
+					percentage = Math.round(item.tag.similarity * 100);
+
+				similarity.className = "echo-similarity";
+
+				similarity.textContent = `${percentage}% MATCH`;
+
+				card.appendChild(similarity);
+			}
+
 			// Actions container
 			const actions = document.createElement("div");
 
@@ -418,10 +457,12 @@
 
 			info.className = "echo-info";
 
+			// Date
 			const dateSpan = document.createElement("span");
 
 			dateSpan.textContent = formatDate(item.timestamp);
 
+			// Size
 			const sizeSpan = document.createElement("span");
 
 			sizeSpan.textContent = `${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}`;
@@ -429,7 +470,7 @@
 			info.append(dateSpan, sizeSpan);
 
 			// Assemble card
-			card.append(link, actions, info);
+			card.append(actions, info);
 
 			fragment.appendChild(card);
 		});
@@ -481,6 +522,23 @@
 	function closeModal() {
 		$modalView.classList.add("hidden");
 		$modalContent.innerHTML = "";
+	}
+
+	function handleSearch(query) {
+		const normalized = query.trim();
+
+		if (normalized === currentQuery) {
+			return;
+		}
+
+		currentQuery = normalized;
+
+		currentPage = 1;
+		hasMore = true;
+		$gallery.innerHTML = "";
+		echoCache.clear();
+
+		loadEchos();
 	}
 
 	async function copyLink(hash, btnElement) {
@@ -607,6 +665,20 @@
 
 		$logoutBtn.addEventListener("click", () => {
 			logout(true);
+		});
+
+		$searchInput.addEventListener("keydown", event => {
+			if (event.key === "Enter") {
+				handleSearch(event.target.value);
+
+				$searchInput.blur();
+			} else if (event.key === "Escape") {
+				$searchInput.value = "";
+
+				handleSearch("");
+
+				$searchInput.blur();
+			}
 		});
 
 		$gallery.addEventListener("click", async event => {

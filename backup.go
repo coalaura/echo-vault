@@ -123,19 +123,28 @@ func StartBackupLoop() error {
 				log.Warnf("Failed to evict backups: %v\n", err)
 			}
 
-			wait, next := backups.Next()
+			if count.Load() > 0 {
+				wait, next := backups.Next()
 
-			if wait > 0 {
+				if wait > 0 {
+					log.Printf("Next backup in %s\n", wait.Round(time.Second))
+
+					time.Sleep(wait)
+				}
+
+				err = backups.Create(next)
+				if err != nil {
+					log.Warnf("Failed to create backup: %v\n", err)
+
+					time.Sleep(5 * time.Second)
+				}
+			} else {
+				wait := time.Duration(config.Backup.Interval) * time.Hour
+
+				log.Println("Nothing to back up")
 				log.Printf("Next backup in %s\n", wait.Round(time.Second))
 
 				time.Sleep(wait)
-			}
-
-			err = backups.Create(next)
-			if err != nil {
-				log.Warnf("Failed to create backup: %v\n", err)
-
-				time.Sleep(5 * time.Second)
 			}
 		}
 	}()
