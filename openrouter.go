@@ -94,12 +94,14 @@ var (
 	}
 )
 
-func (e *Echo) GenerateTags() {
+func (e *Echo) GenerateTags(noLogs bool) {
 	if config.AI.OpenRouterToken == "" || !e.IsImage() {
 		return
 	}
 
-	log.Debugf("[%s] Tagging...\n", e.Hash)
+	if !noLogs {
+		log.Debugf("[%s] Tagging...\n", e.Hash)
+	}
 
 	img, err := e.ReadAsJpegBase64()
 	if err != nil {
@@ -188,7 +190,9 @@ func (e *Echo) GenerateTags() {
 		return
 	}
 
-	log.Debugf("[%s] Tagging completed\n", e.Hash)
+	if !noLogs {
+		log.Debugf("[%s] Tagging completed\n", e.Hash)
+	}
 }
 
 func (e *Echo) ReadAsJpegBase64() (string, error) {
@@ -244,8 +248,8 @@ func (t *EchoTag) Clean() error {
 		return fmt.Errorf("invalid safety tag: %q", t.Safety)
 	}
 
-	if len(t.Text) > 10 {
-		return fmt.Errorf("too much text: %d", len(t.Text))
+	if len(t.Text) > 16 {
+		t.Text = t.Text[:16]
 	}
 
 	t.Caption = unidecode.Unidecode(t.Caption)

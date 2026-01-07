@@ -63,6 +63,8 @@ func main() {
 	usage.Add(size)
 	count.Add(total)
 
+	go RunBackfill(total)
+
 	handleTasks()
 
 	r := chi.NewRouter()

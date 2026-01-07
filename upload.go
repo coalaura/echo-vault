@@ -196,7 +196,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("store")
 
-	go echo.GenerateTags()
+	go echo.GenerateTags(false)
 
 	okay(w, "application/json")
 
