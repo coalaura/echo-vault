@@ -281,19 +281,20 @@ header {
 	background: var(--surface-hover);
 }
 
-.echo-card.sensitive .echo-media {
+.echo-card.blurred .echo-media {
 	filter: blur(20px) grayscale(0.5);
 	transform: scale(1.1);
 	transition: filter 0.3s ease, transform 0.3s ease;
+	transition-delay: 1.5s;
 }
 
-.echo-card.sensitive:hover .echo-media {
+.echo-card.blurred:hover .echo-media {
 	filter: blur(0) grayscale(0);
 	transform: scale(1);
 }
 
-.echo-card.sensitive .echo-link::after {
-	content: "SENSITIVE_CONTENT";
+.echo-card.blurred .echo-link::after {
+	content: "";
 	position: absolute;
 	inset: 0;
 	display: flex;
@@ -310,12 +311,57 @@ header {
 	backdrop-filter: blur(4px);
 	opacity: 1;
 	transition: opacity 0.3s ease, transform 0.3s ease;
+	transition-delay: 1s;
 	pointer-events: none;
 	z-index: 5;
 }
 
-.echo-card.sensitive:hover .echo-link::after {
+.echo-card.blurred:hover .echo-link::after {
 	opacity: 0;
+}
+
+.echo-card.safety-sensitive .echo-link::after {
+	content: "SENSITIVE";
+}
+
+.echo-card.safety-suggestive .echo-link::after {
+	content: "SUGGESTIVE";
+}
+
+.echo-card.safety-explicit .echo-link::after {
+	content: "NSFW";
+}
+
+.echo-card.safety-violence .echo-link::after {
+	content: "VIOLENCE";
+}
+
+.echo-card.safety-selfharm .echo-link::after {
+	content: "SELF-HARM";
+}
+
+.echo-card.blurred {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+.echo-card.safety-explicit {
+	border-color: rgba(255, 85, 85, 0.9);
+}
+
+.echo-card.safety-selfharm {
+	border-color: rgba(255, 85, 85, 0.9);
+}
+
+.echo-card.safety-violence {
+	border-color: rgba(255, 170, 85, 0.9);
+}
+
+.echo-card.safety-suggestive {
+	border-color: rgba(255, 255, 255, 0.35);
+}
+
+.echo-card.safety-sensitive {
+	border-color: rgba(255, 255, 255, 0.25);
 }
 
 .media-loader,

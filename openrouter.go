@@ -76,9 +76,13 @@ var (
 			},
 			"safety": {
 				Type:        jsonschema.String,
-				Description: "Safety of the image",
+				Description: "Safety classification of the image",
 				Enum: []string{
 					"ok",
+					"suggestive",
+					"explicit",
+					"violence",
+					"selfharm",
 					"sensitive",
 				},
 			},
@@ -253,7 +257,9 @@ func (t *EchoTag) Clean() error {
 
 	t.Caption = unidecode.Unidecode(t.Caption)
 
-	if t.Safety != "ok" && t.Safety != "sensitive" {
+	switch t.Safety {
+	case "ok", "suggestive", "explicit", "violence", "selfharm", "sensitive":
+	default:
 		return fmt.Errorf("invalid safety tag: %q", t.Safety)
 	}
 

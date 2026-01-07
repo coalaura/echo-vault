@@ -325,8 +325,8 @@
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
-			if (item.tag?.safety === "sensitive") {
-				card.classList.add("sensitive");
+			if (item.tag?.safety && item.tag?.safety !== "ok") {
+				card.classList.add("blurred", `safety-${item.tag?.safety}`);
 			}
 
 			// Link container
