@@ -241,12 +241,6 @@ func (t *EchoTag) Clean() error {
 		return fmt.Errorf("too many categories: %d", len(t.Categories))
 	}
 
-	if len(t.Tags) < 1 {
-		return errors.New("missing tags")
-	} else if len(t.Tags) > 32 {
-		return fmt.Errorf("too many tags: %d", len(t.Tags))
-	}
-
 	t.Caption = strings.TrimSpace(t.Caption)
 
 	if len(t.Caption) < 1 {
@@ -255,38 +249,50 @@ func (t *EchoTag) Clean() error {
 		return fmt.Errorf("caption too long: %d", len(t.Caption))
 	}
 
+	t.Caption = unidecode.Unidecode(t.Caption)
+
 	if t.Safety != "ok" && t.Safety != "sensitive" {
 		return fmt.Errorf("invalid safety tag: %q", t.Safety)
 	}
 
-	if len(t.Text) > 16 {
-		t.Text = t.Text[:16]
-	}
+	tags := make([]string, 0, len(t.Tags))
 
-	t.Caption = unidecode.Unidecode(t.Caption)
-
-	for i, tag := range t.Tags {
+	for _, tag := range t.Tags {
 		tag = strings.TrimSpace(tag)
 
-		if len(tag) < 1 {
-			return fmt.Errorf("tag %d empty", i+1)
-		} else if len(tag) > 32 {
-			return fmt.Errorf("tag %d too long: %d", i+1, len(tag))
+		if len(tag) < 1 || len(tag) > 32 {
+			continue
 		}
 
-		t.Tags[i] = unidecode.Unidecode(tag)
+		tags = append(tags, unidecode.Unidecode(tag))
 	}
 
-	for i, text := range t.Text {
+	t.Tags = tags
+
+	if len(t.Tags) < 1 {
+		return errors.New("missing tags")
+	} else if len(t.Tags) > 32 {
+		t.Tags = t.Tags[:32]
+	}
+
+	texts := make([]string, 0, len(t.Text))
+
+	for _, text := range t.Text {
 		text = strings.TrimSpace(text)
 
 		if len(text) < 1 {
-			return fmt.Errorf("text %d empty", i+1)
+			continue
 		} else if len(text) > 196 {
 			text = text[:196]
 		}
 
-		t.Text[i] = unidecode.Unidecode(text)
+		texts = append(texts, unidecode.Unidecode(text))
+	}
+
+	t.Text = texts
+
+	if len(t.Text) > 16 {
+		t.Text = t.Text[:16]
 	}
 
 	return nil
