@@ -23,13 +23,16 @@ type EchoDatabase struct {
 }
 
 func ConnectToDatabase() (*EchoDatabase, error) {
-	db, err := sql.Open("sqlite", DatabasePath)
+	dsn := fmt.Sprintf("%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)", DatabasePath)
+
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(16)
+	db.SetMaxIdleConns(16)
+	db.SetConnMaxLifetime(time.Hour)
 
 	b := NewTableBuilder(db, "echos")
 
