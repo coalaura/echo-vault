@@ -82,6 +82,10 @@ func (e *Echo) Unlink() error {
 		return err
 	}
 
+	if vector != nil {
+		vector.Delete(e.Hash)
+	}
+
 	usage.Add(^uint64(e.Size - 1))
 
 	return nil

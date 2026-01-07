@@ -165,10 +165,6 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if vector != nil {
-		vector.Delete(hash)
-	}
-
 	count.Add(^uint64(0))
 
 	okay(w)
