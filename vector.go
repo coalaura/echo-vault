@@ -84,3 +84,7 @@ func (s *VectorStore) Has(hash string) bool {
 
 	return err == nil
 }
+
+func (s *VectorStore) Delete(hash string) error {
+	return s.collection.Delete(context.Background(), nil, nil, hash)
+}
