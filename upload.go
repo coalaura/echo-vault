@@ -196,7 +196,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("store")
 
-	go echo.GenerateTags(false)
+	returnNew := r.URL.Query().Has("return")
+
+	if returnNew {
+		echo.GenerateTags(false)
+	} else {
+		go echo.GenerateTags(false)
+	}
 
 	okay(w, "application/json")
 
@@ -209,7 +215,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		"timing":    timer,
 	}
 
-	if r.URL.Query().Has("return") {
+	if returnNew {
 		result["echo"] = echo
 	}
 
