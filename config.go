@@ -77,7 +77,7 @@ func NewDefaultConfig() EchoConfig {
 			Port:           8080,
 			Direct:         false,
 			UploadToken:    "p4$$w0rd",
-			MaxFileSize:    10,
+			MaxFileSize:    20,
 			MaxConcurrency: 4,
 			DeleteOrphans:  false,
 		},
