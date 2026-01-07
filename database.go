@@ -273,14 +273,16 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 		done = make(chan bool)
 	)
 
-	log.Printf("Verifying 0%% (0 of %d)\n", total)
+	log.Printf("Verifying echos 0%% (0 of %d)\n", total)
 
 	ticker := time.NewTicker(time.Second)
-
 	defer ticker.Stop()
 
 	wg.Go(func() {
-		totalF := float64(total)
+		var (
+			last   uint64
+			totalF = float64(total)
+		)
 
 		for {
 			select {
@@ -288,9 +290,16 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 				return
 			case <-ticker.C:
 				current := completed.Load()
+
+				if current == last {
+					continue
+				}
+
 				percentage := float64(current) / totalF * 100
 
-				log.Printf("Verifying %.1f%% (%d of %d)\n", percentage, current, total)
+				log.Printf("Verifying echos %.1f%% (%d of %d)\n", percentage, current, total)
+
+				last = current
 			}
 		}
 	})
@@ -346,7 +355,7 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 		return 0, 0, err
 	}
 
-	log.Printf("Verifying 100%% (%d of %d)\n", total, total)
+	log.Printf("Verifying echos 100%% (%d of %d)\n", total, total)
 
 	if len(invalid) > 0 {
 		if config.Server.DeleteOrphans {
