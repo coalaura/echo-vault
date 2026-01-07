@@ -6,10 +6,14 @@ A blazing fast, minimal ShareX backend written in Go. Echo-Vault features a powe
 
 - Drop-in ShareX uploader with bearer-token auth
 - Minimal, responsive Web UI for gallery viewing and management
+- Find screenshots by describing them ("blue car", "internet speed test") using local vector embeddings
+- Automatically generates metadata and tags for images via OpenRouter (LLMs)
+- Scheduled `tar.gz` snapshots of your database and media files with configurable retention policies
 - Configurable image processing to WebP, PNG, or JPEG
 - Video transcoding and optimization (MP4, WebM, etc.) powered by ffmpeg
 - Advanced GIF pipeline: convert from video, resample, downscale, reduce colors, and optimize with gifsicle
 - Import existing files straight into the database with the `scan` command
+- Smart background backfilling for existing uploads
 - Commented `config.yml` generated on first run
 
 ![example](.github/example.png)
@@ -54,6 +58,16 @@ server:
   # maximum concurrent uploads (default: 4)
   max_concurrency: 4
 
+backup:
+  # if backups should be created (default: true)
+  enabled: true
+  # how often backups should be created (in hours; default: 120)
+  interval: 120
+  # how many backups to keep before deleting the oldest (default: 4)
+  keep_amount: 4
+  # if files (images/videos) should be included in backups (without, only the database is backed up; default: true)
+  backup_files: true
+
 images:
   # target format for images (webp, png or jpeg; default: webp)
   format: webp
@@ -85,6 +99,18 @@ gifs:
   max_framerate: 15
   # maximum width/height (1 - 1024; default: 480)
   max_width: 480
+
+ai:
+  # openrouter token for image tagging (if empty, disables image tagging; default: )
+  openrouter_token: ""
+  # model used for image tagging (requires vision and structured output support; default: google/gemma-3-27b-it)
+  tagging_model: google/gemma-3-27b-it
+  # model used for embedding (requires embedding support; default: openai/text-embedding-3-small)
+  embedding_model: openai/text-embedding-3-small
+  # if echos without tags should be re-tagged (default: false)
+  re_tag_empty: false
+  # minimum similarity percentage (0-100) for search results to be included (default: 40)
+  min_similarity: 40
 ```
 
 ## API & Nginx
@@ -125,11 +151,12 @@ All API routes under `/upload` and `/echos` expect `Authorization: Bearer <token
 
 ### `GET /info`
 
-Returns the current server version.
+Returns the current server version and feature flags.
 
 ```json
 {
-    "version": "dev"
+    "version": "dev",
+    "queries": true
 }
 ```
 
@@ -159,7 +186,7 @@ Upload a file via multipart form (`upload=<file>`). Supported types: JPEG, PNG, 
 
 ### `GET /echos/{page}`
 
-Returns up to 15 uploads per page (1-indexed).
+Returns up to 100 uploads per page (1-indexed). The `tag` object contains safety info. Unsafe images are blurred in the dashboard until hovered.
 
 ```json
 [
@@ -169,7 +196,28 @@ Returns up to 15 uploads per page (1-indexed).
         "name": "my video.mp4",
         "extension": "mp4",
         "upload_size": 2483452,
-        "timestamp": 1761174760
+        "timestamp": 1761174760,
+        "tag": {
+            "safety": "ok"
+        }
+    }
+]
+```
+
+### `GET /query/{page}?q={query}`
+
+Semantic search endpoint. Returns results sorted by relevance. Includes a `similarity` score in the tag object (0.0 - 1.0).
+
+```json
+[
+    {
+        "id": 45,
+        "hash": "B82JSD9A2",
+        "timestamp": 1761175000,
+        "tag": {
+            "safety": "ok",
+            "similarity": 0.4281
+        }
     }
 ]
 ```
@@ -177,11 +225,3 @@ Returns up to 15 uploads per page (1-indexed).
 ### `DELETE /echos/{hash}`
 
 Removes both the file and its database entry. Replies with `200 OK`.
-
-## CLI
-
-Echo-Vault doubles as a tiny maintenance tool when invoked with commands:
-
-### `echo-vault scan`
-
-Walks the `storage/` directory and imports missing files into the database. Progress is logged to stdout.
