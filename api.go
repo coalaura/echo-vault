@@ -224,7 +224,7 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 		if !IsValidSafety(request.Safety) {
 			err = fmt.Errorf("invalid safety tag: %q", request.Safety)
 		} else {
-			echo.Tag.Safety = request.Safety
+			echo.Safety = request.Safety
 
 			err = database.SetSafety(echo.Hash, request.Safety)
 		}
@@ -317,7 +317,7 @@ func queryEchosHandler(w http.ResponseWriter, r *http.Request) {
 
 		for i, echo := range results {
 			if score, ok := scoreMap[echo.Hash]; ok {
-				results[i].Tag.Similarity = score
+				results[i].Similarity = score
 			}
 		}
 

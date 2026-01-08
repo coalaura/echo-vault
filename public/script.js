@@ -340,8 +340,8 @@
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
-			if (!noBlur && item.tag?.safety && item.tag?.safety !== "ok" && !ignoreSafety.includes(item.tag?.safety)) {
-				card.classList.add("blurred", `safety-${item.tag?.safety}`);
+			if (!noBlur && item.safety && item.safety !== "ok" && !ignoreSafety.includes(item.safety)) {
+				card.classList.add("blurred", `safety-${item.safety}`);
 			}
 
 			// Link container
@@ -439,9 +439,9 @@
 			card.appendChild(link);
 
 			// Similarity
-			if (item.tag?.similarity) {
+			if (item.similarity) {
 				const similarity = document.createElement("div"),
-					percentage = Math.round(item.tag.similarity * 100);
+					percentage = Math.round(item.similarity * 100);
 
 				similarity.className = "echo-similarity";
 
@@ -535,6 +535,31 @@
 			isVideo = VideoExtensions.includes(ext);
 
 		$modalViewContent.innerHTML = "";
+		$modalViewContent.style.width = "";
+
+		// Meta Badge (Dimensions + Size)
+		const metaBadge = document.createElement("div");
+
+		metaBadge.className = "media-meta";
+
+		$modalViewContent.appendChild(metaBadge);
+
+		// Media
+		const updateWidth = event => {
+			const media = event.target,
+				width = media.getBoundingClientRect().width;
+
+			if (width > 0) {
+				$modalViewContent.style.width = `${Math.ceil(width) + 2}px`;
+			}
+
+			const nw = isVideo ? media.videoWidth : media.naturalWidth,
+				nh = isVideo ? media.videoHeight : media.naturalHeight;
+
+			if (nw && nh) {
+				metaBadge.textContent = `${nw}x${nh} - ${formatBytes(item.size)}`;
+			}
+		};
 
 		if (isVideo) {
 			const vid = document.createElement("video");
@@ -548,13 +573,28 @@
 				localStorage.setItem(VolumeKey, vid.volume);
 			});
 
+			media.addEventListener("loadeddata", updateWidth);
+
 			$modalViewContent.appendChild(vid);
 		} else {
 			const img = document.createElement("img");
 
 			img.src = url;
 
+			img.addEventListener("load", updateWidth);
+
 			$modalViewContent.appendChild(img);
+		}
+
+		// Caption
+		if (item.caption) {
+			const caption = document.createElement("div");
+
+			caption.className = "caption";
+
+			caption.textContent = item.caption;
+
+			$modalViewContent.appendChild(caption);
 		}
 
 		$modalView.classList.remove("hidden");
@@ -666,8 +706,8 @@
 		$modalTag.classList.remove("hidden");
 		$modalTag.dataset.hash = hash;
 
-		if (item.tag?.sensitive) {
-			$tagSelect.value = item.tag.sensitive;
+		if (item.safety) {
+			$tagSelect.value = item.safety;
 		} else {
 			$tagSelect.value = "auto";
 		}
@@ -699,12 +739,12 @@
 
 		try {
 			const response = await fetchWithAuth(`/echos/${hash}`, null, {
-					method: "PUT",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(body),
-				});
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(body),
+			});
 
 			if (!response.ok) {
 				const msg = await parseResponseError(response);
@@ -725,7 +765,7 @@
 
 			renderItems(data.echo, false);
 
-			const newTag = data.echo.tag?.safety || "ok";
+			const newTag = data.echo.safety || "ok";
 
 			showNotification(`Re-Tag complete: ${newTag} ${newTag !== "ok" && (noBlur || ignoreSafety.includes(newTag)) ? "(ignored)" : ""}`, "success");
 		} catch (err) {

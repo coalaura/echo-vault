@@ -85,11 +85,12 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 
 func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 	var (
-		e      Echo
-		safety sql.NullString
+		e       Echo
+		caption sql.NullString
+		safety  sql.NullString
 	)
 
-	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &caption, &safety)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -98,13 +99,14 @@ func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 		return nil, err
 	}
 
-	e.Tag.Safety = safety.String
+	e.Caption = caption.String
+	e.Safety = safety.String
 
 	return &e, nil
 }
 
 func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
-	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -115,16 +117,18 @@ func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
 
 	for rows.Next() {
 		var (
-			e      Echo
-			safety sql.NullString
+			e       Echo
+			caption sql.NullString
+			safety  sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &caption, &safety)
 		if err != nil {
 			return nil, err
 		}
 
-		e.Tag.Safety = safety.String
+		e.Caption = caption.String
+		e.Safety = safety.String
 
 		echos = append(echos, e)
 	}
@@ -147,7 +151,7 @@ func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
 
 	var b strings.Builder
 
-	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
+	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos WHERE hash IN (")
 	b.WriteString(placeholders)
 	b.WriteString(") ORDER BY CASE hash ")
 
@@ -180,16 +184,18 @@ func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
 
 	for rows.Next() {
 		var (
-			e      Echo
-			safety sql.NullString
+			e       Echo
+			caption sql.NullString
+			safety  sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &caption, &safety)
 		if err != nil {
 			return nil, err
 		}
 
-		e.Tag.Safety = safety.String
+		e.Caption = caption.String
+		e.Safety = safety.String
 
 		echos = append(echos, e)
 	}
