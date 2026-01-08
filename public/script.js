@@ -38,7 +38,9 @@
 		echoCache = new Map(),
 		totalSize = 0,
 		totalCount = 0,
-		currentQuery = "";
+		currentQuery = "",
+		noBlur = false,
+		ignoreSafety = [];
 
 	if (typeof globalVolume !== "number" || !Number.isFinite(globalVolume) || globalVolume < 0 || globalVolume > 1) {
 		globalVolume = 0.75;
@@ -48,14 +50,14 @@
 
 	let $notifyArea;
 
-	function init() {
+	async function init() {
 		$notifyArea = document.createElement("div");
 
 		$notifyArea.id = "notification-area";
 
 		document.body.appendChild($notifyArea);
 
-		fetchInfo();
+		await fetchInfo();
 
 		if (authToken) {
 			verifyToken(authToken);
@@ -185,6 +187,14 @@
 				searchEnabled = true;
 
 				$searchWrapper.classList.remove("hidden");
+			}
+
+			if (!data.blur) {
+				noBlur = true;
+			}
+
+			if (data.ignore?.length) {
+				ignoreSafety = data.ignore;
 			}
 		} catch (err) {
 			console.error(`Failed to fetch version: ${err}`);
@@ -330,7 +340,7 @@
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
-			if (item.tag?.safety && item.tag?.safety !== "ok") {
+			if (!noBlur && item.tag?.safety && item.tag?.safety !== "ok" && !ignoreSafety.includes(item.tag?.safety)) {
 				card.classList.add("blurred", `safety-${item.tag?.safety}`);
 			}
 
@@ -867,7 +877,9 @@
 
 				renderItems(data.echo, false);
 
-				showNotification("Re-Tag complete", "success");
+				const newTag = data.echo.tag?.safety || "ok";
+
+				showNotification(`Re-Tag complete: ${newTag} ${newTag !== "ok" && (noBlur || ignoreSafety.includes(newTag)) ? "(ignored)" : ""}`, "success");
 			} catch (err) {
 				showNotification(err.message, "error");
 			} finally {
