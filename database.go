@@ -243,6 +243,15 @@ func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	return nil
 }
 
+func (d *EchoDatabase) SetSafety(hash string, safety string) error {
+	_, err := d.Exec("UPDATE echos SET safety = ? WHERE hash = ?", safety, hash)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (d *EchoDatabase) SetTags(hash string, entry EchoTag) error {
 	categories, tags, caption, text, safety := entry.Serialize()
 

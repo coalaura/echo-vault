@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -14,6 +15,11 @@ import (
 )
 
 const PageSize = 100
+
+type EchoUpdateRequest struct {
+	Action string `json:"action"`
+	Safety string `json:"safety"`
+}
 
 func infoHandler(w http.ResponseWriter, r *http.Request) {
 	okay(w, "application/json")
@@ -168,6 +174,77 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 	count.Add(^uint64(0))
 
 	okay(w)
+}
+
+func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	if !validateHash(hash) {
+		abort(w, http.StatusBadRequest, "invalid hash format")
+
+		log.Warnln("update: invalid hash")
+
+		return
+	}
+
+	var request EchoUpdateRequest
+
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		abort(w, http.StatusBadRequest, "bad request")
+
+		log.Warnln("update: bad request")
+
+		return
+	}
+
+	echo, err := database.Find(hash)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "database error")
+
+		log.Warnln("update: failed to find echo")
+		log.Warnln(err)
+
+		return
+	}
+
+	if echo == nil {
+		abort(w, http.StatusNotFound, "echo not found")
+
+		log.Warnf("update: echo %q not found\n", hash)
+
+		return
+	}
+
+	switch request.Action {
+	case "re_tag":
+		echo.GenerateTags(false)
+	case "set_safety":
+		if !IsValidSafety(request.Safety) {
+			err = fmt.Errorf("invalid safety tag: %q", request.Safety)
+		} else {
+			echo.Tag.Safety = request.Safety
+
+			err = database.SetSafety(echo.Hash, request.Safety)
+		}
+	default:
+		err = fmt.Errorf("unknown action %q", request.Action)
+	}
+
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "something went wrong")
+
+		log.Warnf("update: %v\n", err)
+
+		return
+	}
+
+	okay(w, "application/json")
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"echo":  echo,
+		"size":  usage.Load(),
+		"count": count.Load(),
+	})
 }
 
 func queryEchosHandler(w http.ResponseWriter, r *http.Request) {

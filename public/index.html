@@ -53,9 +53,32 @@
 				</div>
 			</section>
 
-			<div id="modal-view" class="hidden">
+			<div id="modal-view" class="modal hidden">
 				<div class="modal-backdrop"></div>
 				<div class="modal-content"></div>
+			</div>
+
+			<div id="modal-tag" class="modal hidden">
+				<div class="modal-backdrop"></div>
+				<div class="modal-content">
+					<div class="modal-header">Re-Tag Echo</div>
+					<div class="modal-form">
+						<label for="tag-select">Set Tag:</label>
+						<select id="tag-select">
+							<option value="auto">Auto</option>
+							<option value="ok">Ok</option>
+							<option value="suggestive">Suggestive</option>
+							<option value="explicit">Explicit</option>
+							<option value="violence">Violence</option>
+							<option value="selfharm">Self-Harm</option>
+							<option value="sensitive">Sensitive</option>
+						</select>
+					</div>
+					<div class="modal-buttons">
+						<button id="tag-close-btn">CLOSE</button>
+						<button id="tag-update-btn">UPDATE</button>
+					</div>
+				</div>
 			</div>
 
 			<div id="drop-overlay" class="hidden">
