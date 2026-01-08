@@ -364,6 +364,35 @@ header {
 	border-color: rgba(255, 255, 255, 0.25);
 }
 
+.echo-card.processing {
+	pointer-events: none;
+}
+
+.echo-card.processing::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: rgba(17, 17, 17, 0.6);
+	backdrop-filter: blur(2px);
+	z-index: 40;
+}
+
+.echo-card.processing::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin-top: -0.75rem;
+	margin-left: -0.75rem;
+	width: 1.5rem;
+	height: 1.5rem;
+	border: 2px solid var(--text-muted);
+	border-top-color: var(--text-main);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	z-index: 41;
+}
+
 .media-loader,
 .media-error {
 	position: absolute;
@@ -467,7 +496,7 @@ header {
 	opacity: 1;
 }
 
-#modal-view {
+.modal {
 	position: fixed;
 	inset: 0;
 	z-index: 200;
@@ -491,9 +520,10 @@ header {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	border: 1px solid var(--text-muted);
+	border: 1px solid var(--border);
 	background: var(--bg);
-	box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+	box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
+	overflow: hidden;
 }
 
 .modal-content img,
@@ -501,6 +531,89 @@ header {
 	max-width: 100%;
 	max-height: 90vh;
 	display: block;
+}
+
+#modal-tag .modal-content {
+	width: 100%;
+	max-width: 400px;
+	min-width: 300px;
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.modal-header {
+	padding: 1.25rem 1.5rem;
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
+	color: var(--text-main);
+	font-family: var(--font-mono);
+	font-weight: 600;
+	font-size: 0.9rem;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.modal-form {
+	padding: 2rem 1.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.modal-form label {
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+
+.modal-form select {
+	width: 100%;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	color: var(--text-main);
+	padding: 0.75rem 1rem;
+	font-family: var(--font-mono);
+	font-size: 0.9rem;
+	border-radius: 2px;
+	outline: none;
+	transition: border-color 0.2s;
+	cursor: pointer;
+}
+
+.modal-form select:focus {
+	border-color: var(--text-muted);
+}
+
+.modal-buttons {
+	padding: 1rem 1.5rem;
+	background: var(--surface);
+	border-top: 1px solid var(--border);
+	display: flex;
+	justify-content: flex-end;
+	gap: 1rem;
+}
+
+#tag-close-btn {
+	background: transparent;
+	color: var(--text-muted);
+	padding: 0.5rem 1rem;
+	border: 1px solid transparent;
+}
+
+#tag-close-btn:hover {
+	color: var(--text-main);
+}
+
+#tag-update-btn {
+	background: var(--text-main);
+	color: var(--bg);
+	padding: 0.5rem 1.5rem;
+}
+
+#tag-update-btn:hover {
+	opacity: 0.9;
 }
 
 #empty-state {

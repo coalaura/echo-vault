@@ -257,9 +257,7 @@ func (t *EchoTag) Clean() error {
 
 	t.Caption = unidecode.Unidecode(t.Caption)
 
-	switch t.Safety {
-	case "ok", "suggestive", "explicit", "violence", "selfharm", "sensitive":
-	default:
+	if !IsValidSafety(t.Safety) {
 		return fmt.Errorf("invalid safety tag: %q", t.Safety)
 	}
 
@@ -320,4 +318,13 @@ func (t *EchoTag) EmbeddingString() string {
 	text := strings.Join(t.Text, "\x1E")
 
 	return cats + "\x1F" + tags + "\x1F" + t.Caption + "\x1F" + text
+}
+
+func IsValidSafety(safety string) bool {
+	switch safety {
+	case "ok", "suggestive", "explicit", "violence", "selfharm", "sensitive":
+		return true
+	}
+
+	return false
 }

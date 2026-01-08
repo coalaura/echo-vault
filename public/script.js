@@ -6,6 +6,7 @@
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
 		$modalView = document.getElementById("modal-view"),
+		$modalTag = document.getElementById("modal-tag"),
 		$loginForm = document.getElementById("login-form"),
 		$apiToken = document.getElementById("api-token"),
 		$loginError = document.getElementById("login-error"),
@@ -21,8 +22,12 @@
 		$totalSize = document.getElementById("total-size"),
 		$totalCount = document.getElementById("total-count"),
 		$versionTags = document.querySelectorAll(".version-tag"),
-		$modalContent = document.querySelector(".modal-content"),
-		$modalBackdrop = document.querySelector(".modal-backdrop");
+		$modalViewContent = $modalView.querySelector(".modal-content"),
+		$modalViewBackdrop = $modalView.querySelector(".modal-backdrop"),
+		$modalTagBackdrop = $modalTag.querySelector(".modal-backdrop"),
+		$tagSelect = document.getElementById("tag-select"),
+		$tagCloseBtn = document.getElementById("tag-close-btn"),
+		$tagUpdateBtn = document.getElementById("tag-update-btn");
 
 	let authToken = localStorage.getItem(StorageKey),
 		globalVolume = parseFloat(localStorage.getItem(VolumeKey)),
@@ -313,15 +318,15 @@
 			list = Array.isArray(items) ? items : [items];
 
 		list.forEach(item => {
-			echoCache.set(item.hash, item);
-
-			const ext = item.extension,
+			const id = `echo-${item.hash}`,
+				ext = item.extension,
 				url = item.url,
 				isVideo = VideoExtensions.includes(ext);
 
 			// Card container
 			const card = document.createElement("div");
 
+			card.id = id;
 			card.className = "echo-card";
 			card.dataset.hash = item.hash;
 
@@ -338,10 +343,13 @@
 
 			// Loader
 			const loader = document.createElement("div");
+
 			loader.className = "media-loader";
 
 			const spinner = document.createElement("span");
+
 			spinner.className = "spinner";
+
 			loader.appendChild(spinner);
 
 			link.appendChild(loader);
@@ -437,6 +445,15 @@
 
 			actions.className = "echo-actions";
 
+			const tagBtn = document.createElement("button");
+
+			tagBtn.className = "action-btn";
+
+			tagBtn.dataset.action = "tag";
+			tagBtn.dataset.hash = item.hash;
+
+			tagBtn.textContent = "TAG";
+
 			const copyBtn = document.createElement("button");
 
 			copyBtn.className = "action-btn";
@@ -454,7 +471,7 @@
 
 			deleteBtn.textContent = "DEL";
 
-			actions.append(copyBtn, deleteBtn);
+			actions.append(tagBtn, copyBtn, deleteBtn);
 
 			// Info container
 			const info = document.createElement("div");
@@ -476,7 +493,17 @@
 			// Assemble card
 			card.append(actions, info);
 
-			fragment.appendChild(card);
+			const exists = document.getElementById(id);
+
+			if (exists) {
+				exists.replaceWith(card);
+			} else {
+				fragment.appendChild(card);
+			}
+
+			item.el = card;
+
+			echoCache.set(item.hash, item);
 		});
 
 		if (prepend) {
@@ -497,7 +524,7 @@
 			url = item.url,
 			isVideo = VideoExtensions.includes(ext);
 
-		$modalContent.innerHTML = "";
+		$modalViewContent.innerHTML = "";
 
 		if (isVideo) {
 			const vid = document.createElement("video");
@@ -511,21 +538,23 @@
 				localStorage.setItem(VolumeKey, vid.volume);
 			});
 
-			$modalContent.appendChild(vid);
+			$modalViewContent.appendChild(vid);
 		} else {
 			const img = document.createElement("img");
 
 			img.src = url;
 
-			$modalContent.appendChild(img);
+			$modalViewContent.appendChild(img);
 		}
 
 		$modalView.classList.remove("hidden");
 	}
 
-	function closeModal() {
+	function closeModals() {
+		$modalTag.classList.add("hidden");
+
 		$modalView.classList.add("hidden");
-		$modalContent.innerHTML = "";
+		$modalViewContent.innerHTML = "";
 	}
 
 	function handleSearch(query) {
@@ -617,10 +646,35 @@
 		}
 	}
 
+	async function updateTag(hash) {
+		const item = echoCache.get(hash);
+
+		if (!item || item.el.classList.contains("processing")) {
+			return;
+		}
+
+		$modalTag.classList.remove("hidden");
+		$modalTag.dataset.hash = hash;
+
+		if (item.tag?.sensitive) {
+			$tagSelect.value = item.tag.sensitive;
+		} else {
+			$tagSelect.value = "auto";
+		}
+	}
+
 	async function deleteEcho(hash, noConfirm = false) {
+		const item = echoCache.get(hash);
+
+		if (!item || item.el.classList.contains("processing")) {
+			return;
+		}
+
 		if (!noConfirm && !confirm("Delete this echo?")) {
 			return;
 		}
+
+		item.el.classList.add("processing");
 
 		try {
 			const response = await fetchWithAuth(`/echos/${hash}`, null, {
@@ -633,22 +687,14 @@
 				throw new Error(msg);
 			}
 
-			const card = document.querySelector(`.echo-card[data-hash="${hash}"]`);
+			item.el.remove();
 
-			if (card) {
-				card.remove();
-			}
+			totalSize -= item.size;
+			totalCount--;
 
-			const echo = echoCache.get(hash);
+			updateTotalSize();
 
-			if (echo) {
-				totalSize -= echo.size;
-				totalCount--;
-
-				updateTotalSize();
-
-				echoCache.delete(hash);
-			}
+			echoCache.delete(hash);
 
 			if ($gallery.children.length === 0) {
 				$emptyState.classList.remove("hidden");
@@ -657,6 +703,8 @@
 			showNotification("Echo deleted", "success");
 		} catch (error) {
 			showNotification(error.message, "error");
+		} finally {
+			item.el.classList.remove("processing");
 		}
 	}
 
@@ -697,7 +745,9 @@
 				const action = btn.dataset.action,
 					hash = btn.dataset.hash;
 
-				if (action === "copy") {
+				if (action === "tag") {
+					updateTag(hash);
+				} else if (action === "copy") {
 					copyLink(hash, btn);
 				} else if (action === "delete") {
 					deleteEcho(hash, event.shiftKey);
@@ -719,11 +769,12 @@
 			}
 		});
 
-		$modalBackdrop.addEventListener("click", closeModal);
+		$modalViewBackdrop.addEventListener("click", closeModals);
+		$modalTagBackdrop.addEventListener("click", closeModals);
 
 		document.addEventListener("keydown", event => {
-			if (event.key === "Escape" && !$modalView.classList.contains("hidden")) {
-				closeModal();
+			if (event.key === "Escape") {
+				closeModals();
 			}
 		});
 
@@ -750,6 +801,77 @@
 
 			if (files.length > 0) {
 				handleUpload(files[0]);
+			}
+		});
+
+		$tagCloseBtn.addEventListener("click", () => {
+			closeModals();
+		});
+
+		$tagUpdateBtn.addEventListener("click", async () => {
+			if ($modalTag.classList.contains("hidden")) {
+				return;
+			}
+
+			const hash = $modalTag.dataset.hash,
+				item = hash ? echoCache.get(hash) : null;
+
+			if (!item || item.el.classList.contains("processing")) {
+				return;
+			}
+
+			closeModals();
+
+			item.el.classList.add("processing");
+
+			const tag = $tagSelect.value;
+
+			let body;
+
+			if (tag === "auto") {
+				body = {
+					action: "re_tag",
+				};
+			} else {
+				body = {
+					action: "set_safety",
+					safety: tag,
+				};
+			}
+
+			try {
+				const response = await fetchWithAuth(`/echos/${hash}`, null, {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(body),
+				});
+
+				if (!response.ok) {
+					const msg = await parseResponseError(response);
+
+					throw new Error(msg);
+				}
+
+				const data = await response.json();
+
+				if (!data) {
+					throw new Error("invalid response");
+				}
+
+				totalSize = data.size || 0;
+				totalCount = data.count || 0;
+
+				updateTotalSize();
+
+				renderItems(data.echo, false);
+
+				showNotification("Re-Tag complete", "success");
+			} catch (err) {
+				showNotification(err.message, "error");
+			} finally {
+				item.el.classList.remove("processing");
 			}
 		});
 

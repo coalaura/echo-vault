@@ -84,6 +84,7 @@ func main() {
 		gr.Post("/upload", uploadHandler)
 		gr.Get("/echos/{page}", listEchosHandler)
 		gr.Get("/query/{page}", queryEchosHandler)
+		gr.Put("/echos/{hash}", updateEchoHandler)
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 
