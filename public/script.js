@@ -1,7 +1,27 @@
 (() => {
 	const StorageKey = "echo_vault_token",
 		VolumeKey = "echo_vault_volume",
-		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"];
+		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"],
+		Resolutions = [
+			[4320, "8K"],
+			[2880, "5K"],
+			[2160, "4K"],
+			[2048, "2K-DCI"],
+			[1600, "WQXGA"],
+			[1536, "QXGA"],
+			[1440, "QHD"],
+			[1200, "WUXGA"],
+			[1080, "FHD"],
+			[960, "qHD"],
+			[900, "900P"],
+			[800, "WXGA"],
+			[768, "XGA"],
+			[720, "HD"],
+			[600, "SVGA"],
+			[576, "PAL"],
+			[480, "SD"],
+			[240, "NTSC"],
+		];
 
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
@@ -133,6 +153,33 @@
 		}
 
 		return `${s}s`;
+	}
+
+	function getResolutionTag(w, h) {
+		const long = Math.max(w, h),
+			short = Math.min(w, h);
+
+		if (short === 1440) {
+			if (long >= 5120) {
+				return "DQHD";
+			}
+
+			if (long >= 3440) {
+				return "UWQHD";
+			}
+		}
+
+		if (short === 1080 && long >= 2560) {
+			return "UW-HD";
+		}
+
+		if (short === 1600 && long >= 3840) {
+			return "UW-4K";
+		}
+
+		const match = Resolutions.find(([val]) => short >= val);
+
+		return match ? match[1] : "";
 	}
 
 	function showNotification(message, type = "info") {
@@ -537,56 +584,55 @@
 		$modalViewContent.innerHTML = "";
 		$modalViewContent.style.width = "";
 
-		// Meta Badge (Dimensions + Size)
-		const metaBadge = document.createElement("div");
+		let media, meta;
 
-		metaBadge.className = "media-meta";
+		const updateMeta = () => {
+			const nw = isVideo ? media.videoWidth : media.naturalWidth,
+				nh = isVideo ? media.videoHeight : media.naturalHeight,
+				rect = media.getBoundingClientRect();
 
-		$modalViewContent.appendChild(metaBadge);
-
-		// Media
-		const updateWidth = event => {
-			const media = event.target,
-				width = media.getBoundingClientRect().width;
-
-			if (width > 0) {
-				$modalViewContent.style.width = `${Math.ceil(width) + 2}px`;
+			if (rect.width > 0) {
+				$modalViewContent.style.width = `${Math.ceil(rect.width) + 2}px`;
 			}
 
-			const nw = isVideo ? media.videoWidth : media.naturalWidth,
-				nh = isVideo ? media.videoHeight : media.naturalHeight;
+			if (nw && nh && rect.width > 0) {
+				const tag = getResolutionTag(nw, nh);
 
-			if (nw && nh) {
-				metaBadge.textContent = `${nw}x${nh} - ${formatBytes(item.size)}`;
+				meta.textContent = `${tag ? `${tag} // ` : ""}${nw}x${nh} // ${formatBytes(item.size)}`;
 			}
 		};
 
 		if (isVideo) {
-			const vid = document.createElement("video");
+			media = document.createElement("video");
 
-			vid.src = url;
-			vid.volume = globalVolume;
-			vid.controls = true;
-			vid.autoplay = true;
+			media.src = url;
 
-			vid.addEventListener("volumechange", () => {
-				localStorage.setItem(VolumeKey, vid.volume);
+			media.volume = globalVolume;
+			media.controls = true;
+			media.autoplay = true;
+
+			media.addEventListener("volumechange", () => {
+				localStorage.setItem(VolumeKey, media.volume);
 			});
 
-			media.addEventListener("loadeddata", updateWidth);
-
-			$modalViewContent.appendChild(vid);
+			media.addEventListener("loadeddata", updateMeta);
 		} else {
-			const img = document.createElement("img");
+			media = document.createElement("img");
 
-			img.src = url;
+			media.src = url;
 
-			img.addEventListener("load", updateWidth);
-
-			$modalViewContent.appendChild(img);
+			media.addEventListener("load", updateMeta);
 		}
 
-		// Caption
+		$modalViewContent.appendChild(media);
+
+		// Meta Badge
+		meta = document.createElement("div");
+
+		meta.className = "media-meta";
+
+		$modalViewContent.appendChild(meta);
+
 		if (item.caption) {
 			const caption = document.createElement("div");
 

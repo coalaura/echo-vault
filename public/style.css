@@ -254,7 +254,9 @@ header {
 	background: var(--surface);
 	border: 1px solid var(--border);
 	overflow: hidden;
-	transition: border-color 0.2s, box-shadow 0.2s;
+	transition:
+		border-color 0.2s,
+		box-shadow 0.2s;
 	cursor: pointer;
 }
 
@@ -284,7 +286,9 @@ header {
 .echo-card.blurred .echo-media {
 	filter: blur(20px) grayscale(0.5);
 	transform: scale(1.1);
-	transition: filter 0.3s ease, transform 0.3s ease;
+	transition:
+		filter 0.3s ease,
+		transform 0.3s ease;
 	transition-delay: 0s;
 }
 
@@ -311,7 +315,9 @@ header {
 	margin: 1rem;
 	backdrop-filter: blur(4px);
 	opacity: 1;
-	transition: opacity 0.3s ease, transform 0.3s ease;
+	transition:
+		opacity 0.3s ease,
+		transform 0.3s ease;
 	pointer-events: none;
 	z-index: 5;
 }
