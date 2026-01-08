@@ -6,6 +6,8 @@ import (
 	"github.com/philippgille/chromem-go"
 )
 
+const TagsDirectory = "tags"
+
 type VectorStore struct {
 	db         *chromem.DB
 	collection *chromem.Collection
@@ -21,7 +23,7 @@ func LoadVectorStore() (*VectorStore, error) {
 		return nil, nil
 	}
 
-	db, err := chromem.NewPersistentDB("tags", false)
+	db, err := chromem.NewPersistentDB(TagsDirectory, false)
 	if err != nil {
 		return nil, err
 	}
