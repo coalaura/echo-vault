@@ -656,7 +656,7 @@
 		}
 	}
 
-	async function updateTag(hash) {
+	async function viewTagModal(hash) {
 		const item = echoCache.get(hash);
 
 		if (!item || item.el.classList.contains("processing")) {
@@ -670,6 +670,68 @@
 			$tagSelect.value = item.tag.sensitive;
 		} else {
 			$tagSelect.value = "auto";
+		}
+	}
+
+	async function updateTag(hash, tag) {
+		const item = hash ? echoCache.get(hash) : null;
+
+		if (!item || item.el.classList.contains("processing")) {
+			return;
+		}
+
+		closeModals();
+
+		item.el.classList.add("processing");
+
+		let body;
+
+		if (tag === "auto") {
+			body = {
+				action: "re_tag",
+			};
+		} else {
+			body = {
+				action: "set_safety",
+				safety: tag,
+			};
+		}
+
+		try {
+			const response = await fetchWithAuth(`/echos/${hash}`, null, {
+					method: "PUT",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify(body),
+				});
+
+			if (!response.ok) {
+				const msg = await parseResponseError(response);
+
+				throw new Error(msg);
+			}
+
+			const data = await response.json();
+
+			if (!data) {
+				throw new Error("invalid response");
+			}
+
+			totalSize = data.size || 0;
+			totalCount = data.count || 0;
+
+			updateTotalSize();
+
+			renderItems(data.echo, false);
+
+			const newTag = data.echo.tag?.safety || "ok";
+
+			showNotification(`Re-Tag complete: ${newTag} ${newTag !== "ok" && (noBlur || ignoreSafety.includes(newTag)) ? "(ignored)" : ""}`, "success");
+		} catch (err) {
+			showNotification(err.message, "error");
+		} finally {
+			item.el.classList.remove("processing");
 		}
 	}
 
@@ -756,7 +818,11 @@
 					hash = btn.dataset.hash;
 
 				if (action === "tag") {
-					updateTag(hash);
+					if (event.shiftKey) {
+						updateTag(hash, "auto");
+					} else {
+						viewTagModal(hash);
+					}
 				} else if (action === "copy") {
 					copyLink(hash, btn);
 				} else if (action === "delete") {
@@ -823,68 +889,7 @@
 				return;
 			}
 
-			const hash = $modalTag.dataset.hash,
-				item = hash ? echoCache.get(hash) : null;
-
-			if (!item || item.el.classList.contains("processing")) {
-				return;
-			}
-
-			closeModals();
-
-			item.el.classList.add("processing");
-
-			const tag = $tagSelect.value;
-
-			let body;
-
-			if (tag === "auto") {
-				body = {
-					action: "re_tag",
-				};
-			} else {
-				body = {
-					action: "set_safety",
-					safety: tag,
-				};
-			}
-
-			try {
-				const response = await fetchWithAuth(`/echos/${hash}`, null, {
-					method: "PUT",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify(body),
-				});
-
-				if (!response.ok) {
-					const msg = await parseResponseError(response);
-
-					throw new Error(msg);
-				}
-
-				const data = await response.json();
-
-				if (!data) {
-					throw new Error("invalid response");
-				}
-
-				totalSize = data.size || 0;
-				totalCount = data.count || 0;
-
-				updateTotalSize();
-
-				renderItems(data.echo, false);
-
-				const newTag = data.echo.tag?.safety || "ok";
-
-				showNotification(`Re-Tag complete: ${newTag} ${newTag !== "ok" && (noBlur || ignoreSafety.includes(newTag)) ? "(ignored)" : ""}`, "success");
-			} catch (err) {
-				showNotification(err.message, "error");
-			} finally {
-				item.el.classList.remove("processing");
-			}
+			updateTag($modalTag.dataset.hash, $tagSelect.value);
 		});
 
 		window.addEventListener("dragenter", event => {
