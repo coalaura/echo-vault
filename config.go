@@ -20,6 +20,11 @@ type EchoConfigServer struct {
 	DeleteOrphans  bool   `yaml:"delete_orphans"`
 }
 
+type EchoConfigUI struct {
+	NoSafetyBlur bool     `yaml:"no_safety_blur"`
+	IgnoreSafety []string `yaml:"ignore_safety"`
+}
+
 type EchoConfigBackup struct {
 	Enabled     bool `yaml:"enabled"`
 	Interval    int  `yaml:"interval"`
@@ -63,6 +68,7 @@ type EchoConfig struct {
 	gifsicle string
 
 	Server EchoConfigServer `yaml:"server"`
+	UI     EchoConfigUI     `yaml:"ui"`
 	Backup EchoConfigBackup `yaml:"backup"`
 	Images EchoConfigImages `yaml:"images"`
 	Videos EchoConfigVideos `yaml:"videos"`
@@ -80,6 +86,10 @@ func NewDefaultConfig() EchoConfig {
 			MaxFileSize:    20,
 			MaxConcurrency: 4,
 			DeleteOrphans:  false,
+		},
+		UI: EchoConfigUI{
+			NoSafetyBlur: false,
+			IgnoreSafety: []string{},
 		},
 		Backup: EchoConfigBackup{
 			Enabled:     true,
@@ -163,6 +173,15 @@ func (c *EchoConfig) Validate() error {
 
 	if c.Server.MaxConcurrency < 1 {
 		return fmt.Errorf("server.max_concurrency must be >= 1, got %d", c.Server.MaxConcurrency)
+	}
+
+	// ui
+	if len(c.UI.IgnoreSafety) > 0 {
+		for i, tag := range c.UI.IgnoreSafety {
+			if !IsValidSafety(tag) {
+				return fmt.Errorf("ui.ignore_safety[%d] is not a valid safety tag: %q", i, tag)
+			}
+		}
 	}
 
 	// backup
@@ -281,6 +300,9 @@ func (e *EchoConfig) Store() error {
 		"$.server.max_file_size":   {yaml.HeadComment(fmt.Sprintf(" maximum upload file-size in MB (default: %vMB)", def.Server.MaxFileSize))},
 		"$.server.max_concurrency": {yaml.HeadComment(fmt.Sprintf(" maximum concurrent uploads (default: %v)", def.Server.MaxConcurrency))},
 		"$.server.delete_orphans":  {yaml.HeadComment(fmt.Sprintf(" if echos without their file should be deleted (default: %v)", def.Server.DeleteOrphans))},
+
+		"$.ui.no_safety_blur": {yaml.HeadComment(fmt.Sprintf(" fully ignore safety tags in the UI (default: %v)", def.UI.NoSafetyBlur))},
+		"$.ui.ignore_safety":  {yaml.HeadComment(fmt.Sprintf(" list of safety tags to ignore in the UI (default: %v)", def.UI.IgnoreSafety))},
 
 		"$.backup.enabled":      {yaml.HeadComment(fmt.Sprintf(" if backups should be created (default: %v)", def.Backup.Enabled))},
 		"$.backup.interval":     {yaml.HeadComment(fmt.Sprintf(" how often backups should be created (in hours; default: %v)", def.Backup.Interval))},

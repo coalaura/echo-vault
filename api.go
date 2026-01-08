@@ -27,6 +27,8 @@ func infoHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{
 		"version": Version,
 		"queries": config.AI.OpenRouterToken != "",
+		"blur":    !config.UI.NoSafetyBlur,
+		"ignore":  config.UI.IgnoreSafety,
 	})
 }
 
