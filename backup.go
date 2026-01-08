@@ -3,7 +3,6 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
-	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -21,6 +20,18 @@ const (
 	BackupTimeFormat = "2006_01_02-15_04"
 )
 
+var (
+	backupNamePattern = regexp.MustCompile(`^\d{4}_\d{2}_\d{2}-\d{2}_\d{2}\.tar\.gz$`)
+
+	backupBufferPool = sync.Pool{
+		New: func() any {
+			buf := make([]byte, 1024*1024)
+
+			return &buf
+		},
+	}
+)
+
 type Backup struct {
 	Time time.Time
 	Path string
@@ -33,7 +44,7 @@ type BackupList struct {
 func (b *Backup) Exists() bool {
 	_, err := os.Stat(b.Path)
 
-	return !os.IsNotExist(err)
+	return err == nil
 }
 
 func (b *BackupList) Next() (time.Duration, time.Time) {
@@ -42,7 +53,7 @@ func (b *BackupList) Next() (time.Duration, time.Time) {
 	var newest time.Time
 
 	for _, backup := range b.Backups {
-		if newest.IsZero() || newest.Before(backup.Time) {
+		if backup.Time.After(newest) {
 			newest = backup.Time
 		}
 	}
@@ -155,47 +166,42 @@ func StartBackupLoop() error {
 func ReadBackups() (*BackupList, error) {
 	log.Println("Reading backups...")
 
-	if _, err := os.Stat(BackupDirectory); os.IsNotExist(err) {
-		err = os.MkdirAll(BackupDirectory, 0755)
-		if err != nil {
-			return nil, err
-		}
+	err := os.MkdirAll(BackupDirectory, 0755)
+	if err != nil && !os.IsExist(err) {
+		return nil, err
 	}
 
-	backups := &BackupList{}
+	entries, err := os.ReadDir(BackupDirectory)
+	if err != nil {
+		return nil, err
+	}
 
-	err := filepath.WalkDir(BackupDirectory, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	backups := &BackupList{
+		Backups: make([]*Backup, 0, len(entries)),
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
 
-		name := filepath.Base(path)
+		name := entry.Name()
 
-		rgx := regexp.MustCompile(`(?m)^\d{4}_\d{2}_\d{2}-\d{2}_\d{2}\.tar\.gz$`)
-
-		if !rgx.MatchString(name) {
-			return nil
+		if !backupNamePattern.MatchString(name) {
+			continue
 		}
 
-		name = strings.TrimSuffix(name, ".tar.gz")
-
-		created, err := time.ParseInLocation(BackupTimeFormat, name, time.UTC)
+		created, err := time.ParseInLocation(BackupTimeFormat, strings.TrimSuffix(name, ".tar.gz"), time.UTC)
 		if err != nil {
 			log.Warnf("Failed to parse backup name: %v\n", err)
 
-			return nil
+			continue
 		}
 
 		backups.Backups = append(backups.Backups, &Backup{
 			Time: created,
-			Path: path,
+			Path: filepath.Join(BackupDirectory, name),
 		})
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
 	return backups, nil
@@ -214,18 +220,29 @@ func CreateBackup(now time.Time) (*Backup, error) {
 	defer file.Close()
 
 	gzWriter := gzip.NewWriter(file)
-
-	defer gzWriter.Close()
-
 	tarWriter := tar.NewWriter(gzWriter)
 
-	defer tarWriter.Close()
-
 	err = WriteBackup(tarWriter)
+
+	tarErr := tarWriter.Close()
+	gzErr := gzWriter.Close()
+
 	if err != nil {
-		defer os.Remove(path)
+		os.Remove(path)
 
 		return nil, err
+	}
+
+	if tarErr != nil {
+		os.Remove(path)
+
+		return nil, tarErr
+	}
+
+	if gzErr != nil {
+		os.Remove(path)
+
+		return nil, gzErr
 	}
 
 	log.Println("Completed")
@@ -237,13 +254,18 @@ func CreateBackup(now time.Time) (*Backup, error) {
 }
 
 func WriteBackup(wr *tar.Writer) error {
-	buf := make([]byte, 1024*1024)
-
 	log.Println("Backing up database...")
 
-	err := AddFileToBackup(wr, DatabasePath, buf)
+	err := addFileToBackup(wr, DatabasePath)
 	if err != nil {
 		return err
+	}
+
+	if config.AI.OpenRouterToken != "" {
+		err = writeDirectoryToBackup(wr, TagsDirectory)
+		if err != nil {
+			return err
+		}
 	}
 
 	if !config.Backup.BackupFiles {
@@ -252,44 +274,50 @@ func WriteBackup(wr *tar.Writer) error {
 		return nil
 	}
 
-	log.Println("Reading storage...")
+	return writeDirectoryToBackup(wr, StorageDirectory)
+}
 
-	dir, err := os.OpenFile(StorageDirectory, os.O_RDONLY, 0)
-	if err != nil {
-		return err
-	}
+func writeDirectoryToBackup(wr *tar.Writer, directory string) error {
+	name := filepath.Base(directory)
 
-	defer dir.Close()
+	log.Printf("Reading %s...\n", name)
 
-	err = WriteFileToBackup(wr, dir, StorageDirectory, buf)
-	if err != nil {
-		return err
-	}
+	var fileCount int
 
-	files, err := dir.ReadDir(0)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil
+	err := filepath.WalkDir(directory, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
 		}
 
+		fileCount++
+
+		return nil
+	})
+
+	if err != nil {
 		return err
+	}
+
+	if fileCount == 0 {
+		log.Printf("Skipping %s (empty)\n", name)
+
+		return nil
 	}
 
 	var (
-		wg        sync.WaitGroup
 		completed atomic.Uint64
-		total     = len(files)
-		done      = make(chan bool)
+		done      = make(chan struct{})
+		wg        sync.WaitGroup
 	)
 
-	log.Printf("Backing up 0%% (0 of %d)\n", total)
-
-	ticker := time.NewTicker(time.Second)
-
-	defer ticker.Stop()
+	log.Printf("Backing up %s 0%% (0 of %d)\n", name, fileCount)
 
 	wg.Go(func() {
-		totalF := float64(total)
+		ticker := time.NewTicker(time.Second)
+
+		defer ticker.Stop()
+
+		totalF := float64(fileCount)
 
 		for {
 			select {
@@ -299,34 +327,42 @@ func WriteBackup(wr *tar.Writer) error {
 				current := completed.Load()
 				percentage := float64(current) / totalF * 100
 
-				log.Printf("Backing up %.1f%% (%d of %d)\n", percentage, current, total)
+				log.Printf("Backing up %s %.1f%% (%d of %d)\n", name, percentage, current, fileCount)
 			}
 		}
 	})
 
-	defer func() {
-		close(done)
-
-		wg.Wait()
-	}()
-
-	for _, file := range files {
-		path := filepath.Join(StorageDirectory, file.Name())
-
-		path = filepath.ToSlash(path)
-
-		err = AddFileToBackup(wr, path, buf)
+	err = filepath.WalkDir(directory, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		completed.Add(1)
+		err = addEntryToBackup(wr, path, d)
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			completed.Add(1)
+		}
+
+		return nil
+	})
+
+	close(done)
+
+	wg.Wait()
+
+	if err != nil {
+		return err
 	}
+
+	log.Printf("Backing up %s 100%% (%d of %d)\n", name, fileCount, fileCount)
 
 	return nil
 }
 
-func AddFileToBackup(wr *tar.Writer, path string, buf []byte) error {
+func addFileToBackup(wr *tar.Writer, path string) error {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return err
@@ -334,37 +370,63 @@ func AddFileToBackup(wr *tar.Writer, path string, buf []byte) error {
 
 	defer file.Close()
 
-	return WriteFileToBackup(wr, file, path, buf)
-}
-
-func WriteFileToBackup(wr *tar.Writer, file *os.File, path string, buf []byte) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
 
-	header := &tar.Header{
-		Name:    path,
-		Size:    info.Size(),
-		Mode:    int64(info.Mode()),
-		ModTime: info.ModTime(),
-	}
+	return writeFileToBackup(wr, file, path, info)
+}
 
-	if info.IsDir() {
-		header.Typeflag = tar.TypeDir
-	} else {
-		header.Typeflag = tar.TypeReg
-	}
-
-	err = wr.WriteHeader(header)
+func addEntryToBackup(wr *tar.Writer, path string, d fs.DirEntry) error {
+	info, err := d.Info()
 	if err != nil {
 		return err
 	}
 
-	if info.IsDir() {
-		return nil
+	if d.IsDir() {
+		return writeDirToBackup(wr, path, info)
 	}
 
-	_, err = io.CopyBuffer(wr, file, buf)
+	file, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	return writeFileToBackup(wr, file, path, info)
+}
+
+func writeDirToBackup(wr *tar.Writer, path string, info fs.FileInfo) error {
+	header := tar.Header{
+		Typeflag: tar.TypeDir,
+		Name:     filepath.ToSlash(path) + "/",
+		Mode:     int64(info.Mode()),
+		ModTime:  info.ModTime(),
+	}
+
+	return wr.WriteHeader(&header)
+}
+
+func writeFileToBackup(wr *tar.Writer, file *os.File, path string, info fs.FileInfo) error {
+	header := tar.Header{
+		Typeflag: tar.TypeReg,
+		Name:     filepath.ToSlash(path),
+		Size:     info.Size(),
+		Mode:     int64(info.Mode()),
+		ModTime:  info.ModTime(),
+	}
+
+	err := wr.WriteHeader(&header)
+	if err != nil {
+		return err
+	}
+
+	bufPtr := backupBufferPool.Get().(*[]byte)
+
+	defer backupBufferPool.Put(bufPtr)
+
+	_, err = io.CopyBuffer(wr, file, *bufPtr)
 	return err
 }
