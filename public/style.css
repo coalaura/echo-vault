@@ -516,10 +516,9 @@ header {
 	position: relative;
 	z-index: 201;
 	max-width: 90vw;
-	max-height: 90vh;
 	display: flex;
-	align-items: center;
-	justify-content: center;
+	flex-direction: column;
+	width: fit-content;
 	border: 1px solid var(--border);
 	background: var(--bg);
 	box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7);
@@ -528,9 +527,39 @@ header {
 
 .modal-content img,
 .modal-content video {
-	max-width: 100%;
-	max-height: 90vh;
 	display: block;
+	width: auto;
+	height: auto;
+	max-width: 90vw;
+	max-height: 85vh;
+	min-width: min(320px, 90vw);
+	min-height: 200px;
+	flex: 0 1 auto;
+	object-fit: contain;
+	background: #000;
+}
+
+.modal-content .media-meta {
+	position: absolute;
+	top: 1rem;
+	left: 1rem;
+	background: rgba(0, 0, 0, 0.75);
+	backdrop-filter: blur(4px);
+	padding: 0.35rem 0.6rem;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	font-family: var(--font-mono);
+	font-size: 0.75rem;
+	color: var(--text-main);
+	border-radius: 2px;
+	pointer-events: none;
+	z-index: 205;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	user-select: none;
+}
+
+.modal-content:hover .media-meta {
+	opacity: 1;
 }
 
 #modal-tag .modal-content {
@@ -551,6 +580,23 @@ header {
 	font-size: 0.9rem;
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
+	flex-shrink: 0;
+}
+
+.modal-content .caption {
+	padding: 0.75rem 1rem;
+	background: var(--surface);
+	border-top: 1px solid var(--border);
+	font-family: var(--font-mono);
+	font-size: 0.8rem;
+	color: var(--text-main);
+	text-align: center;
+	flex-shrink: 0;
+	word-break: break-word;
+	overflow-y: auto;
+	max-height: 30vh;
+	width: 0;
+	min-width: 100%;
 }
 
 .modal-form {

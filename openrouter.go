@@ -203,7 +203,8 @@ func (e *Echo) GenerateTags(noLogs bool) float64 {
 		return cost
 	}
 
-	e.Tag.Safety = result.Safety
+	e.Caption = result.Caption
+	e.Safety = result.Safety
 
 	if !noLogs {
 		log.Debugf("[%s] Tagging completed\n", e.Hash)
