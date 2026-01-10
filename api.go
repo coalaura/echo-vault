@@ -106,7 +106,7 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	echos, err := database.FindAll((page-1)*PageSize, PageSize)
+	echos, err := database.FindAll(r.Context(), (page-1)*PageSize, PageSize)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 
@@ -135,7 +135,7 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	echo, err := database.Find(hash)
+	echo, err := database.Find(r.Context(), hash)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 
@@ -199,7 +199,9 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	echo, err := database.Find(hash)
+	ctx := r.Context()
+
+	echo, err := database.Find(ctx, hash)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 
@@ -219,7 +221,7 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch request.Action {
 	case "re_tag":
-		echo.GenerateTags(false)
+		echo.GenerateTags(ctx, false)
 	case "set_safety":
 		if !IsValidSafety(request.Safety) {
 			err = fmt.Errorf("invalid safety tag: %q", request.Safety)
@@ -278,7 +280,9 @@ func queryEchosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ranked, err := vector.Query(r.Context(), query, page*PageSize)
+	ctx := r.Context()
+
+	ranked, err := vector.Query(ctx, query, page*PageSize)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "failed search")
 
@@ -305,7 +309,7 @@ func queryEchosHandler(w http.ResponseWriter, r *http.Request) {
 			scoreMap[res.Hash] = res.Similarity
 		}
 
-		results, err := database.FindByHashes(hashes)
+		results, err := database.FindByHashes(ctx, hashes)
 		if err != nil {
 			abort(w, http.StatusInternalServerError, "database error")
 

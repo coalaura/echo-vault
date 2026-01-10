@@ -225,3 +225,11 @@ Semantic search endpoint. Returns results sorted by relevance. Includes a `simil
 ### `DELETE /echos/{hash}`
 
 Removes both the file and its database entry. Replies with `200 OK`.
+
+## CLI
+
+Echo-Vault doubles as a tiny maintenance tool when invoked with commands:
+
+### `echo-vault scan`
+
+Walks the `storage/` directory and imports missing files into the database. Progress is logged to stdout.

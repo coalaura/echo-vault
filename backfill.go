@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -63,7 +64,7 @@ func RunBackfill(total uint64) {
 	})
 
 	for {
-		echos, err := database.FindAll(offset, ReTagChunkSize)
+		echos, err := database.FindAll(context.Background(), offset, ReTagChunkSize)
 		if err != nil {
 			break
 		}
@@ -75,10 +76,16 @@ func RunBackfill(total uint64) {
 				continue
 			}
 
+			if !echo.Exists() {
+				completed.Add(1)
+
+				continue
+			}
+
 			queue.Work(func() error {
 				defer completed.Add(1)
 
-				cost := echo.GenerateTags(true)
+				cost := echo.GenerateTags(context.Background(), true)
 				if cost > 0 {
 					totalCostMx.Lock()
 					totalCost += cost

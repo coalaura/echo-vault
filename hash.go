@@ -1,17 +1,18 @@
 package main
 
 import (
+	"context"
 	"math/rand"
 	"regexp"
 )
 
 var hashRgx = regexp.MustCompile(`^[0-9A-Z]{10}$`)
 
-func (d *EchoDatabase) Hash() (string, error) {
+func (d *EchoDatabase) Hash(ctx context.Context) (string, error) {
 	for {
 		hash := generateHash()
 
-		echo, err := d.Find(hash)
+		echo, err := d.Find(ctx, hash)
 		if err != nil {
 			return "", err
 		}

@@ -98,7 +98,7 @@ var (
 	}
 )
 
-func (e *Echo) GenerateTags(noLogs bool) float64 {
+func (e *Echo) GenerateTags(ctx context.Context, noLogs bool) float64 {
 	if config.AI.OpenRouterToken == "" || !e.IsImage() {
 		return 0
 	}
@@ -114,7 +114,7 @@ func (e *Echo) GenerateTags(noLogs bool) float64 {
 		return 0
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	client := openrouter.NewClient(config.AI.OpenRouterToken, openrouter.WithXTitle("Echo-Vault"), openrouter.WithHTTPReferer("https://github.com/coalaura/echo-vault"))
@@ -318,7 +318,7 @@ func (t *EchoTag) EmbeddingString() string {
 	tags := strings.Join(t.Tags, "\x1E")
 	text := strings.Join(t.Text, "\x1E")
 
-	return cats + "\x1F" + tags + "\x1F" + t.Caption + "\x1F" + text
+	return cats + "\x1F" + tags + "\x1F" + text
 }
 
 func IsValidSafety(safety string) bool {
