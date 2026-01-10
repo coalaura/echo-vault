@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -179,7 +180,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("write").Start("store")
 
-	err = database.Create(echo)
+	err = database.Create(context.Background(), echo)
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 
@@ -199,9 +200,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	returnNew := r.URL.Query().Has("return")
 
 	if returnNew {
-		echo.GenerateTags(false)
+		echo.GenerateTags(context.Background(), false)
 	} else {
-		go echo.GenerateTags(false)
+		go echo.GenerateTags(context.Background(), false)
 	}
 
 	okay(w, "application/json")

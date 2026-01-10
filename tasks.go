@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -105,7 +106,7 @@ func scanStorage() error {
 	for i, echo := range create {
 		log.Printf("[%d/%d] Creating echo %s...\n", i+1, len(create), echo.Hash)
 
-		err = database.Create(&echo)
+		err = database.Create(context.Background(), &echo)
 		if err != nil {
 			return err
 		}

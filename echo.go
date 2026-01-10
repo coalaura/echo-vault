@@ -37,9 +37,9 @@ func (e Echo) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (e *Echo) Fill() error {
+func (e *Echo) Fill(ctx context.Context) error {
 	if e.Hash == "" {
-		hash, err := database.Hash()
+		hash, err := database.Hash(ctx)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 		return 0, err
 	}
 
-	err = e.Fill()
+	err = e.Fill(ctx)
 	if err != nil {
 		return 0, err
 	}

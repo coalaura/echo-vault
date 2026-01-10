@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -83,14 +84,14 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 	return exists, nil
 }
 
-func (d *EchoDatabase) Find(hash string) (*Echo, error) {
+func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 	var (
 		e       Echo
 		caption sql.NullString
 		safety  sql.NullString
 	)
 
-	err := d.QueryRow("SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &caption, &safety)
+	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &caption, &safety)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -105,8 +106,8 @@ func (d *EchoDatabase) Find(hash string) (*Echo, error) {
 	return &e, nil
 }
 
-func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
-	rows, err := d.Query("SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, caption, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +142,7 @@ func (d *EchoDatabase) FindAll(offset, limit int) ([]Echo, error) {
 	return echos, nil
 }
 
-func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
+func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Echo, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
@@ -173,7 +174,7 @@ func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
 		args = append(args, hash)
 	}
 
-	rows, err := d.Query(b.String(), args...)
+	rows, err := d.QueryContext(ctx, b.String(), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +209,8 @@ func (d *EchoDatabase) FindByHashes(hashes []string) ([]Echo, error) {
 	return echos, nil
 }
 
-func (d *EchoDatabase) Create(echo *Echo) error {
-	err := echo.Fill()
+func (d *EchoDatabase) Create(ctx context.Context, echo *Echo) error {
+	err := echo.Fill(ctx)
 	if err != nil {
 		return err
 	}
@@ -325,7 +326,7 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 	invalid := make([]any, 0)
 
 	for {
-		echos, err = d.FindAll(offset, VerifyChunkSize)
+		echos, err = d.FindAll(context.Background(), offset, VerifyChunkSize)
 		if err != nil {
 			break
 		}

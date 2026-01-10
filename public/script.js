@@ -52,7 +52,7 @@
 	let authToken = localStorage.getItem(StorageKey),
 		globalVolume = parseFloat(localStorage.getItem(VolumeKey)),
 		currentPage = 1,
-		isLoading = false,
+		isBusy = false,
 		hasMore = true,
 		dragCounter = 0,
 		echoCache = new Map(),
@@ -60,7 +60,8 @@
 		totalCount = 0,
 		currentQuery = "",
 		noBlur = false,
-		ignoreSafety = [];
+		ignoreSafety = [],
+		queryController;
 
 	if (typeof globalVolume !== "number" || !Number.isFinite(globalVolume) || globalVolume < 0 || globalVolume > 1) {
 		globalVolume = 0.75;
@@ -312,15 +313,17 @@
 	}
 
 	async function loadEchos() {
-		if (isLoading || !hasMore) {
+		if (!hasMore || isBusy) {
 			return;
 		}
 
-		isLoading = true;
+		queryController?.abort();
 
-		$searchInput.setAttribute("disabled", true);
+		queryController = new AbortController();
 
 		$loader.classList.remove("hidden");
+
+		let aborted;
 
 		try {
 			let endpoint;
@@ -331,7 +334,9 @@
 				endpoint = `/echos/${currentPage}`;
 			}
 
-			const response = await fetchWithAuth(endpoint);
+			const response = await fetchWithAuth(endpoint, null, {
+				signal: queryController.signal,
+			});
 
 			if (!response.ok) {
 				const msg = await parseResponseError(response);
@@ -360,13 +365,17 @@
 				currentPage++;
 			}
 		} catch (error) {
-			showNotification(error.message, "error");
+			aborted = queryController.signal.aborted;
+
+			if (!aborted) {
+				showNotification(error.message, "error");
+			}
 		} finally {
-			isLoading = false;
+			queryController = null;
 
-			$searchInput.removeAttribute("disabled");
-
-			$loader.classList.add("hidden");
+			if (!aborted) {
+				$loader.classList.add("hidden");
+			}
 		}
 	}
 
@@ -697,6 +706,8 @@
 	}
 
 	async function handleUpload(file) {
+		isBusy = true;
+
 		const formData = new FormData();
 
 		formData.append("upload", file);
@@ -739,6 +750,8 @@
 			$uploadBtn.disabled = false;
 
 			$fileInput.value = "";
+
+			isBusy = false;
 		}
 	}
 
@@ -760,6 +773,10 @@
 	}
 
 	async function updateTag(hash, tag) {
+		if (isBusy) {
+			return;
+		}
+
 		const item = hash ? echoCache.get(hash) : null;
 
 		if (!item || item.el.classList.contains("processing")) {
@@ -767,6 +784,8 @@
 		}
 
 		closeModals();
+
+		isBusy = true;
 
 		item.el.classList.add("processing");
 
@@ -818,10 +837,16 @@
 			showNotification(err.message, "error");
 		} finally {
 			item.el.classList.remove("processing");
+
+			isBusy = false;
 		}
 	}
 
 	async function deleteEcho(hash, noConfirm = false) {
+		if (isBusy) {
+			return;
+		}
+
 		const item = echoCache.get(hash);
 
 		if (!item || item.el.classList.contains("processing")) {
@@ -831,6 +856,8 @@
 		if (!noConfirm && !confirm("Delete this echo?")) {
 			return;
 		}
+
+		isBusy = true;
 
 		item.el.classList.add("processing");
 
@@ -863,6 +890,8 @@
 			showNotification(error.message, "error");
 		} finally {
 			item.el.classList.remove("processing");
+
+			isBusy = false;
 		}
 	}
 
@@ -877,18 +906,44 @@
 			logout(true);
 		});
 
+		let timeout;
+
 		$searchInput.addEventListener("keydown", event => {
 			if (event.key === "Enter") {
+				clearTimeout(timeout);
+
 				handleSearch(event.target.value);
 
 				$searchInput.blur();
 			} else if (event.key === "Escape") {
+				clearTimeout(timeout);
+
 				$searchInput.value = "";
 
 				handleSearch("");
 
 				$searchInput.blur();
 			}
+		});
+
+		const debounce = () => {
+			clearTimeout(timeout);
+
+			if (isBusy) {
+				setTimeout(debounce, 500);
+
+				return;
+			}
+
+			timeout = setTimeout(() => {
+				timeout = null;
+
+				handleSearch($searchInput.value);
+			}, 500);
+		};
+
+		$searchInput.addEventListener("input", () => {
+			debounce();
 		});
 
 		$gallery.addEventListener("click", async event => {

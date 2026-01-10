@@ -8,9 +8,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/signal"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/coalaura/plain"
@@ -35,9 +33,6 @@ var (
 
 func main() {
 	log.Printf("Echo-Vault %s\n", Version)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	err := EnsureStorage()
 	log.MustFail(err)
@@ -114,7 +109,7 @@ func main() {
 		}
 	}()
 
-	<-ctx.Done()
+	log.WaitForInterrupt(true)
 
 	log.Warnln("Shutting down...")
 
