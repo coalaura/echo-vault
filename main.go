@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	_ "embed"
+	"errors"
 	"io/fs"
 	"net/http"
 	"os"
@@ -108,10 +109,14 @@ func main() {
 		log.Printf("Listening at http://localhost%s/\n", addr)
 
 		err = server.ListenAndServe()
-		log.MustFail(err)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Warnln(err)
+		}
 	}()
 
 	<-ctx.Done()
+
+	log.Warnln("Shutting down...")
 
 	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
