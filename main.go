@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"embed"
 	_ "embed"
 	"io/fs"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync/atomic"
+	"syscall"
+	"time"
 
 	"github.com/coalaura/plain"
 	"github.com/go-chi/chi/v5"
@@ -30,6 +34,9 @@ var (
 
 func main() {
 	log.Printf("Echo-Vault %s\n", Version)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	err := EnsureStorage()
 	log.MustFail(err)
@@ -92,8 +99,24 @@ func main() {
 
 	addr := config.Addr()
 
-	log.Printf("Listening at http://localhost%s/\n", addr)
-	http.ListenAndServe(addr, r)
+	server := &http.Server{
+		Addr:    addr,
+		Handler: r,
+	}
+
+	go func() {
+		log.Printf("Listening at http://localhost%s/\n", addr)
+
+		err = server.ListenAndServe()
+		log.MustFail(err)
+	}()
+
+	<-ctx.Done()
+
+	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	server.Shutdown(shutdown)
 }
 
 func getPublicFS() (fs.FS, error) {
