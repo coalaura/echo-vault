@@ -52,7 +52,7 @@
 	let authToken = localStorage.getItem(StorageKey),
 		globalVolume = parseFloat(localStorage.getItem(VolumeKey)),
 		currentPage = 1,
-		isBusy = false,
+		isBusy = 0,
 		hasMore = true,
 		dragCounter = 0,
 		echoCache = new Map(),
@@ -86,7 +86,7 @@
 			switchView("login");
 		}
 
-		setupEventListeners();
+		setupEvents();
 	}
 
 	function formatBytes(bytes) {
@@ -263,7 +263,7 @@
 
 			switchView("dashboard");
 
-			loadEchos();
+			loadEchos().then(setupSSE);
 		} catch {
 			logout(false);
 
@@ -313,7 +313,7 @@
 	}
 
 	async function loadEchos() {
-		if (!hasMore || isBusy) {
+		if (!hasMore || isBusy > 0) {
 			return;
 		}
 
@@ -706,7 +706,7 @@
 	}
 
 	async function handleUpload(file) {
-		isBusy = true;
+		isBusy++;
 
 		const formData = new FormData();
 
@@ -727,20 +727,20 @@
 				throw new Error(msg);
 			}
 
-			const newEcho = (await response.json())?.echo;
+			const data = await response.json();
 
-			if (!newEcho) {
+			if (!data) {
 				throw new Error("invalid response");
 			}
 
-			totalSize += newEcho.size;
+			totalSize += data.echo.size;
 			totalCount++;
 
 			updateTotalSize();
 
 			$emptyState.classList.add("hidden");
 
-			renderItems(newEcho, true);
+			renderItems(data.echo, true);
 
 			showNotification("Upload complete", "success");
 		} catch (err) {
@@ -751,7 +751,7 @@
 
 			$fileInput.value = "";
 
-			isBusy = false;
+			isBusy--;
 		}
 	}
 
@@ -773,10 +773,6 @@
 	}
 
 	async function updateTag(hash, tag) {
-		if (isBusy) {
-			return;
-		}
-
 		const item = hash ? echoCache.get(hash) : null;
 
 		if (!item || item.el.classList.contains("processing")) {
@@ -785,7 +781,7 @@
 
 		closeModals();
 
-		isBusy = true;
+		isBusy++;
 
 		item.el.classList.add("processing");
 
@@ -838,15 +834,28 @@
 		} finally {
 			item.el.classList.remove("processing");
 
-			isBusy = false;
+			isBusy--;
 		}
 	}
 
-	async function deleteEcho(hash, noConfirm = false) {
-		if (isBusy) {
+	function deleteLocalEcho(hash) {
+		const item = echoCache.get(hash);
+
+		if (!item) {
 			return;
 		}
 
+		item.el.remove();
+
+		totalSize -= item.size;
+		totalCount--;
+
+		updateTotalSize();
+
+		echoCache.delete(hash);
+	}
+
+	async function deleteEcho(hash, noConfirm = false) {
 		const item = echoCache.get(hash);
 
 		if (!item || item.el.classList.contains("processing")) {
@@ -857,7 +866,7 @@
 			return;
 		}
 
-		isBusy = true;
+		isBusy++;
 
 		item.el.classList.add("processing");
 
@@ -872,14 +881,7 @@
 				throw new Error(msg);
 			}
 
-			item.el.remove();
-
-			totalSize -= item.size;
-			totalCount--;
-
-			updateTotalSize();
-
-			echoCache.delete(hash);
+			deleteLocalEcho(hash);
 
 			if ($gallery.children.length === 0) {
 				$emptyState.classList.remove("hidden");
@@ -891,11 +893,11 @@
 		} finally {
 			item.el.classList.remove("processing");
 
-			isBusy = false;
+			isBusy--;
 		}
 	}
 
-	function setupEventListeners() {
+	function setupEvents() {
 		$loginForm.addEventListener("submit", event => {
 			event.preventDefault();
 
@@ -929,7 +931,7 @@
 		const debounce = () => {
 			clearTimeout(timeout);
 
-			if (isBusy) {
+			if (isBusy > 0) {
 				setTimeout(debounce, 500);
 
 				return;
@@ -1072,6 +1074,85 @@
 				handleUpload(files[0]);
 			}
 		});
+	}
+
+	function handleEvent(data) {
+		const echo = data?.echo,
+			hash = data?.hash || echo?.hash;
+
+		switch (data?.type) {
+			// create
+			case 0:
+				if (queryController) {
+					return;
+				}
+
+				renderItems(echo, true);
+
+				break;
+
+			// update
+			case 1:
+				if (queryController || !echoCache.has(hash)) {
+					return;
+				}
+
+				renderItems(echo, false);
+
+				break;
+
+			// delete
+			case 2:
+				deleteLocalEcho(hash);
+
+				break;
+		}
+	}
+
+	async function setupSSE() {
+		try {
+			const response = await fetchWithAuth("/echo", null);
+
+			if (!response.ok) {
+				throw new Error(response.statusText);
+			}
+
+			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+			let buffer = "";
+
+			while (true) {
+				const { value, done } = await reader.read();
+
+				if (done) {
+					break;
+				}
+
+				buffer += value;
+
+				while (true) {
+					const index = buffer.indexOf("\n");
+
+					if (index === -1) {
+						break;
+					}
+
+					const chunk = buffer.slice(0, index);
+
+					buffer = buffer.slice(index + 1);
+
+					if (chunk === "ping") {
+						continue;
+					}
+
+					handleEvent(JSON.parse(chunk));
+				}
+			}
+		} catch (err) {
+			console.warn(`SSE error: ${err}`);
+
+			setTimeout(setupSSE, 1000);
+		}
 	}
 
 	init();

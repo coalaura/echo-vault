@@ -85,7 +85,7 @@ func RunBackfill(total uint64) {
 			queue.Work(func() error {
 				defer completed.Add(1)
 
-				cost := echo.GenerateTags(context.Background(), true)
+				cost := echo.GenerateTags(context.Background(), true, true)
 				if cost > 0 {
 					totalCostMx.Lock()
 					totalCost += cost

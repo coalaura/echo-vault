@@ -98,7 +98,7 @@ var (
 	}
 )
 
-func (e *Echo) GenerateTags(ctx context.Context, noLogs bool) float64 {
+func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 	if config.AI.OpenRouterToken == "" || !e.IsImage() {
 		return 0
 	}
@@ -208,6 +208,13 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs bool) float64 {
 
 	if !noLogs {
 		log.Debugf("[%s] Tagging completed\n", e.Hash)
+	}
+
+	if !noSync {
+		hub.Broadcast(Event{
+			Type: EventUpdateEcho,
+			Echo: e,
+		})
 	}
 
 	return cost

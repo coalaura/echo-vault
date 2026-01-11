@@ -173,6 +173,11 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hub.Broadcast(Event{
+		Type: EventDeleteEcho,
+		Hash: hash,
+	})
+
 	count.Add(^uint64(0))
 
 	okay(w)
@@ -221,7 +226,7 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch request.Action {
 	case "re_tag":
-		echo.GenerateTags(ctx, false)
+		echo.GenerateTags(ctx, false, true)
 	case "set_safety":
 		if !IsValidSafety(request.Safety) {
 			err = fmt.Errorf("invalid safety tag: %q", request.Safety)
@@ -241,6 +246,11 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	hub.Broadcast(Event{
+		Type: EventUpdateEcho,
+		Echo: echo,
+	})
 
 	okay(w, "application/json")
 
