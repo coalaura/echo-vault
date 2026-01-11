@@ -197,30 +197,23 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("store")
 
-	returnNew := r.URL.Query().Has("return")
+	hub.Broadcast(Event{
+		Type: EventCreateEcho,
+		Echo: echo,
+	})
 
-	if returnNew {
-		echo.GenerateTags(context.Background(), false)
-	} else {
-		go echo.GenerateTags(context.Background(), false)
-	}
+	go echo.GenerateTags(context.Background(), false, false)
 
 	okay(w, "application/json")
 
-	result := map[string]any{
+	json.NewEncoder(w).Encode(map[string]any{
 		"hash":      echo.Hash,
 		"sniffed":   sniffed,
 		"extension": echo.Extension,
 		"url":       echo.URL(),
 		"change":    formatSizeChange(echo.UploadSize, size),
 		"timing":    timer,
-	}
-
-	if returnNew {
-		result["echo"] = echo
-	}
-
-	json.NewEncoder(w).Encode(result)
+	})
 }
 
 func byteCountSI(b int64) string {

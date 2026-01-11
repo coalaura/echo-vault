@@ -22,8 +22,10 @@ var (
 	config   *EchoConfig
 	database *EchoDatabase
 	vector   *VectorStore
-	usage    atomic.Uint64
-	count    atomic.Uint64
+	hub      = NewHub()
+
+	usage atomic.Uint64
+	count atomic.Uint64
 
 	//go:embed public/*
 	publicFs embed.FS
@@ -70,6 +72,13 @@ func main() {
 
 	handleTasks()
 
+	log.Println("Preparing router...")
+
+	ctx, cancelHub := context.WithCancel(context.Background())
+	defer cancelHub()
+
+	go hub.Run(ctx)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
@@ -84,9 +93,12 @@ func main() {
 	r.Group(func(gr chi.Router) {
 		gr.Use(authenticate)
 
-		gr.Post("/upload", uploadHandler)
+		gr.Get("/echo", hub.Handle)
+
 		gr.Get("/echos/{page}", listEchosHandler)
 		gr.Get("/query/{page}", queryEchosHandler)
+
+		gr.Post("/upload", uploadHandler)
 		gr.Put("/echos/{hash}", updateEchoHandler)
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
@@ -112,6 +124,8 @@ func main() {
 	log.WaitForInterrupt(true)
 
 	log.Warnln("Shutting down...")
+
+	cancelHub()
 
 	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
