@@ -22,7 +22,7 @@ var (
 	config   *EchoConfig
 	database *EchoDatabase
 	vector   *VectorStore
-	hub      = NewHub()
+	hub      *Hub
 
 	usage atomic.Uint64
 	count atomic.Uint64
@@ -77,7 +77,9 @@ func main() {
 	ctx, cancelHub := context.WithCancel(context.Background())
 	defer cancelHub()
 
-	go hub.Run(ctx)
+	hub = NewHub(ctx)
+
+	go hub.Run()
 
 	r := chi.NewRouter()
 
@@ -127,7 +129,7 @@ func main() {
 
 	cancelHub()
 
-	shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	server.Shutdown(shutdown)
