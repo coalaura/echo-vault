@@ -207,12 +207,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	okay(w, "application/json")
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"hash":      echo.Hash,
-		"sniffed":   sniffed,
-		"extension": echo.Extension,
-		"url":       echo.URL(),
-		"change":    formatSizeChange(echo.UploadSize, size),
-		"timing":    timer,
+		"echo":    echo,
+		"sniffed": sniffed,
+		"change":  formatSizeChange(echo.UploadSize, size),
+		"timing":  timer,
 	})
 }
 

@@ -17,6 +17,9 @@ type Event struct {
 	Type int    `json:"type"`
 	Hash string `json:"hash,omitempty"`
 	Echo *Echo  `json:"echo,omitempty"`
+
+	Size  uint64 `json:"size"`
+	Count uint64 `json:"count"`
 }
 
 type Client chan []byte
@@ -61,6 +64,9 @@ func (h *Hub) Run(ctx context.Context) {
 }
 
 func (h *Hub) Broadcast(event Event) {
+	event.Size = usage.Load()
+	event.Count = count.Load()
+
 	b, err := json.Marshal(event)
 	if err != nil {
 		log.Warnf("Failed to encode event: %v\n", err)
