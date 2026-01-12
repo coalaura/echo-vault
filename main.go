@@ -121,13 +121,13 @@ func main() {
 		}
 	}()
 
-	log.WaitForInterrupt(true)
+	log.WaitForInterrupt(false)
 
 	log.Warnln("Shutting down...")
 
 	cancelHub()
 
-	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	server.Shutdown(shutdown)

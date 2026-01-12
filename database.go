@@ -388,6 +388,8 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 				return 0, 0, err
 			}
 
+			total -= int64(len(invalid))
+
 			log.Println("Completed")
 		} else {
 			log.Warnf("%d echos are orphaned\n", len(invalid))
