@@ -255,9 +255,7 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 	okay(w, "application/json")
 
 	json.NewEncoder(w).Encode(map[string]any{
-		"echo":  echo,
-		"size":  usage.Load(),
-		"count": count.Load(),
+		"echo": echo,
 	})
 }
 
