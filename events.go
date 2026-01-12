@@ -22,7 +22,9 @@ type Event struct {
 	Count uint64 `json:"count"`
 }
 
-type Client chan []byte
+type Client struct {
+	send chan []byte
+}
 
 type Hub struct {
 	clients map[*Client]struct{}
@@ -30,37 +32,62 @@ type Hub struct {
 	broadcast  chan []byte
 	register   chan *Client
 	unregister chan *Client
+
+	ctx context.Context
 }
 
-func NewHub() *Hub {
+func NewHub(ctx context.Context) *Hub {
 	return &Hub{
 		clients: make(map[*Client]struct{}),
 
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+
+		ctx: ctx,
 	}
 }
 
-func (h *Hub) Run(ctx context.Context) {
+func (h *Hub) Run() {
+	defer h.closeAll()
+
 	for {
 		select {
-		case <-ctx.Done():
+		case <-h.ctx.Done():
 			return
+
 		case client := <-h.register:
 			h.clients[client] = struct{}{}
+
 		case client := <-h.unregister:
-			delete(h.clients, client)
+			h.removeClient(client)
+
 		case message := <-h.broadcast:
 			for client := range h.clients {
 				select {
-				case *client <- message:
+				case client.send <- message:
 				default:
-					// drop message if client buffer is full
+					h.removeClient(client)
 				}
 			}
 		}
 	}
+}
+
+func (h *Hub) closeAll() {
+	for client := range h.clients {
+		close(client.send)
+		delete(h.clients, client)
+	}
+}
+
+func (h *Hub) removeClient(c *Client) {
+	if _, ok := h.clients[c]; !ok {
+		return
+	}
+
+	delete(h.clients, c)
+	close(c.send)
 }
 
 func (h *Hub) Broadcast(event Event) {
@@ -74,7 +101,11 @@ func (h *Hub) Broadcast(event Event) {
 		return
 	}
 
-	h.broadcast <- b
+	select {
+	case <-h.ctx.Done():
+		return
+	case h.broadcast <- b:
+	}
 }
 
 func (h *Hub) Handle(w http.ResponseWriter, r *http.Request) {
@@ -92,14 +123,21 @@ func (h *Hub) Handle(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	client := make(Client, 10)
+	client := &Client{
+		send: make(chan []byte, 8),
+	}
 
-	h.register <- &client
+	select {
+	case <-h.ctx.Done():
+		return
+	case h.register <- client:
+	}
 
 	defer func() {
-		h.unregister <- &client
-
-		close(client)
+		select {
+		case <-h.ctx.Done():
+		case h.unregister <- client:
+		}
 	}()
 
 	heartbeat := time.NewTicker(30 * time.Second)
@@ -109,7 +147,11 @@ func (h *Hub) Handle(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
-		case msg := <-client:
+		case msg, ok := <-client.send:
+			if !ok {
+				return
+			}
+
 			if err := h.writeSSE(w, rc, flusher, msg); err != nil {
 				return
 			}
