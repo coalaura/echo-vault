@@ -1,5 +1,4 @@
 (() => {
-	// --- Constants ---
 	const StorageKey = "echo_vault_token",
 		VolumeKey = "echo_vault_volume",
 		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"],
@@ -24,7 +23,6 @@
 			[240, "NTSC"],
 		];
 
-	// --- UI Elements ---
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
 		$modalView = document.getElementById("modal-view"),
@@ -54,13 +52,14 @@
 	let $notifyArea;
 
 	const State = {
+		alive: true,
 		token: localStorage.getItem(StorageKey),
 		volume: parseFloat(localStorage.getItem(VolumeKey)),
 		page: 1,
 		busy: 0,
 		hasMore: true,
 		query: "",
-		cache: new Map(), // Maps hash -> Echo Data
+		cache: new Map(),
 		stats: {
 			size: 0,
 			count: 0,
@@ -71,6 +70,7 @@
 		},
 		controllers: {
 			query: null,
+			sse: null,
 		},
 	};
 
@@ -487,7 +487,10 @@
 		}
 
 		State.controllers.query?.abort();
-		State.controllers.query = new AbortController();
+
+		const controller = new AbortController();
+
+		State.controllers.query = controller;
 
 		$loader.classList.remove("hidden");
 
@@ -497,7 +500,7 @@
 			const endpoint = State.query ? `/query/${State.page}?q=${encodeURIComponent(State.query)}` : `/echos/${State.page}`;
 
 			const response = await fetchWithAuth(endpoint, null, {
-				signal: State.controllers.query.signal,
+				signal: controller.signal,
 			});
 
 			if (!response.ok) {
@@ -525,15 +528,15 @@
 				}
 			}
 		} catch (error) {
-			aborted = State.controllers.query.signal.aborted;
+			aborted = controller.signal.aborted;
 
 			if (!aborted) {
 				showNotification(error.message, "error");
 			}
 		} finally {
-			State.controllers.query = null;
-
 			if (!aborted) {
+				State.controllers.query = null;
+
 				$loader.classList.add("hidden");
 			}
 		}
@@ -737,8 +740,16 @@
 	}
 
 	async function setupSSE() {
+		State.controllers.sse?.abort();
+
+		const controller = new AbortController();
+
+		State.controllers.sse = controller;
+
 		try {
-			const response = await fetchWithAuth("/echo", null);
+			const response = await fetchWithAuth("/echo", null, {
+				signal: controller.signal,
+			});
 
 			if (!response.ok) {
 				throw new Error(response.statusText);
@@ -774,6 +785,14 @@
 				}
 			}
 		} catch (err) {
+			if (!controller.signal.aborted) {
+				State.controllers.sse = null;
+			}
+
+			if (!State.alive) {
+				return;
+			}
+
 			console.warn(`SSE error: ${err}, retrying...`);
 
 			setTimeout(setupSSE, 3000);
@@ -1066,6 +1085,7 @@
 			}
 		});
 
+		// Modals
 		$modalViewBackdrop.addEventListener("click", closeModals);
 
 		$modalTagBackdrop.addEventListener("click", closeModals);
@@ -1080,12 +1100,20 @@
 			closeModals();
 		});
 
+		// Tag update
 		$tagUpdateBtn.addEventListener("click", () => {
 			if ($modalTag.classList.contains("hidden")) {
 				return;
 			}
 
 			updateTag($modalTag.dataset.hash, $tagSelect.value);
+		});
+
+		// Window unload
+		window.addEventListener("beforeunload", () => {
+			State.alive = false;
+
+			State.controllers.sse?.abort();
 		});
 	}
 
