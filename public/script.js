@@ -1,4 +1,5 @@
 (() => {
+	// --- Constants ---
 	const StorageKey = "echo_vault_token",
 		VolumeKey = "echo_vault_volume",
 		VideoExtensions = ["mp4", "webm", "mov", "m4v", "mkv"],
@@ -23,6 +24,7 @@
 			[240, "NTSC"],
 		];
 
+	// --- UI Elements ---
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
 		$modalView = document.getElementById("modal-view"),
@@ -49,27 +51,34 @@
 		$tagCloseBtn = document.getElementById("tag-close-btn"),
 		$tagUpdateBtn = document.getElementById("tag-update-btn");
 
-	let authToken = localStorage.getItem(StorageKey),
-		globalVolume = parseFloat(localStorage.getItem(VolumeKey)),
-		currentPage = 1,
-		isBusy = 0,
-		hasMore = true,
-		dragCounter = 0,
-		echoCache = new Map(),
-		totalSize = 0,
-		totalCount = 0,
-		currentQuery = "",
-		noBlur = false,
-		ignoreSafety = [],
-		queryController;
+	let $notifyArea;
 
-	if (typeof globalVolume !== "number" || !Number.isFinite(globalVolume) || globalVolume < 0 || globalVolume > 1) {
-		globalVolume = 0.75;
+	const State = {
+		token: localStorage.getItem(StorageKey),
+		volume: parseFloat(localStorage.getItem(VolumeKey)),
+		page: 1,
+		busy: 0,
+		hasMore: true,
+		query: "",
+		cache: new Map(), // Maps hash -> Echo Data
+		stats: {
+			size: 0,
+			count: 0,
+		},
+		config: {
+			noBlur: false,
+			ignoreSafety: [],
+		},
+		controllers: {
+			query: null,
+		},
+	};
+
+	if (!Number.isFinite(State.volume) || State.volume < 0 || State.volume > 1) {
+		State.volume = 0.75;
 	}
 
 	$searchInput.value = "";
-
-	let $notifyArea;
 
 	async function init() {
 		$notifyArea = document.createElement("div");
@@ -78,10 +87,10 @@
 
 		document.body.appendChild($notifyArea);
 
-		await fetchInfo();
+		await fetchServerInfo();
 
-		if (authToken) {
-			verifyToken(authToken);
+		if (State.token) {
+			verifyToken(State.token);
 		} else {
 			switchView("login");
 		}
@@ -89,16 +98,716 @@
 		setupEvents();
 	}
 
+	function switchView(viewName) {
+		$loginView.classList.add("hidden");
+		$dashboardView.classList.add("hidden");
+
+		if (viewName === "login") {
+			$loginView.classList.remove("hidden");
+		} else {
+			$dashboardView.classList.remove("hidden");
+		}
+	}
+
+	function showNotification(message, type = "info") {
+		const toast = document.createElement("div");
+
+		toast.className = `notification ${type}`;
+		toast.textContent = message;
+
+		$notifyArea.appendChild(toast);
+
+		requestAnimationFrame(() => {
+			setTimeout(() => {
+				toast.classList.add("fade-out");
+
+				toast.addEventListener("animationend", () => toast.remove());
+			}, 3000);
+		});
+	}
+
+	function updateStatsUI() {
+		$totalSize.textContent = formatBytes(State.stats.size);
+		$totalSize.title = formatBytesFull(State.stats.size);
+		$totalCount.textContent = State.stats.count.toLocaleString();
+	}
+
+	function renderBatch(items, method = "append") {
+		const fragment = document.createDocumentFragment(),
+			list = Array.isArray(items) ? items : [items];
+
+		list.forEach(item => {
+			State.cache.set(item.hash, item);
+
+			const existingNode = document.getElementById(`echo-${item.hash}`);
+
+			if (existingNode) {
+				updateEchoNode(existingNode, item);
+
+				return;
+			}
+
+			const node = createEchoNode(item);
+
+			updateEchoNode(node, item);
+
+			fragment.appendChild(node);
+		});
+
+		if (method === "prepend") {
+			$gallery.prepend(fragment);
+		} else {
+			$gallery.appendChild(fragment);
+		}
+	}
+
+	function makeActionButton(hash, text, action, cls = "") {
+		const btn = document.createElement("button");
+
+		btn.className = `action-btn ${cls}`;
+		btn.dataset.action = action;
+		btn.dataset.hash = hash;
+		btn.textContent = text;
+
+		return btn;
+	}
+
+	function createEchoNode(item) {
+		const isVideo = VideoExtensions.includes(item.extension);
+
+		const card = document.createElement("div");
+
+		card.id = `echo-${item.hash}`;
+		card.className = "echo-card";
+		card.dataset.hash = item.hash;
+
+		const link = document.createElement("a");
+
+		link.href = item.url;
+		link.target = "_blank";
+		link.className = "echo-link";
+
+		const loader = document.createElement("div");
+
+		loader.className = "media-loader";
+		loader.innerHTML = '<span class="spinner"></span>';
+
+		link.appendChild(loader);
+
+		let media;
+
+		const onLoad = () => {
+			loader.remove();
+
+			media.classList.add("loaded");
+		};
+
+		const onError = () => {
+			loader.remove();
+
+			const err = document.createElement("div");
+
+			err.className = "media-error";
+			err.textContent = "FAILED";
+
+			link.appendChild(err);
+		};
+
+		if (isVideo) {
+			media = document.createElement("video");
+
+			media.className = "echo-media";
+			media.muted = true;
+			media.loop = true;
+			media.src = item.url;
+
+			const badge = document.createElement("div");
+
+			badge.className = "type-badge";
+			badge.textContent = "▶";
+
+			card.appendChild(badge);
+
+			media.addEventListener("loadeddata", () => {
+				badge.textContent = formatDuration(media.duration);
+
+				onLoad();
+			});
+
+			card.addEventListener("mouseenter", () => media.play());
+
+			card.addEventListener("mouseleave", () => {
+				media.pause();
+
+				media.currentTime = 0;
+			});
+		} else {
+			media = document.createElement("img");
+
+			media.className = "echo-media";
+			media.loading = "lazy";
+			media.src = item.url;
+
+			media.addEventListener("load", onLoad);
+		}
+
+		media.addEventListener("error", onError);
+
+		link.appendChild(media);
+
+		card.appendChild(link);
+
+		const actions = document.createElement("div");
+
+		actions.className = "echo-actions";
+
+		actions.append(makeActionButton(item.hash, "TAG", "tag"), makeActionButton(item.hash, "COPY", "copy"), makeActionButton(item.hash, "DEL", "delete", "delete"));
+
+		const info = document.createElement("div");
+
+		info.className = "echo-info";
+
+		const dateSpan = document.createElement("span");
+
+		dateSpan.className = "meta-date";
+
+		const sizeSpan = document.createElement("span");
+
+		sizeSpan.className = "meta-size";
+
+		info.append(dateSpan, sizeSpan);
+
+		card.append(actions, info);
+
+		return card;
+	}
+
+	function updateEchoNode(node, item) {
+		const shouldBlur = !State.config.noBlur && item.safety && item.safety !== "ok" && !State.config.ignoreSafety.includes(item.safety);
+
+		node.classList.remove("blurred", "safety-suggestive", "safety-explicit", "safety-violence", "safety-sensitive");
+
+		if (shouldBlur) {
+			node.classList.add("blurred", `safety-${item.safety}`);
+		}
+
+		let simBadge = node.querySelector(".echo-similarity");
+
+		if (item.similarity) {
+			if (!simBadge) {
+				simBadge = document.createElement("div");
+
+				simBadge.className = "echo-similarity";
+
+				node.appendChild(simBadge);
+			}
+
+			simBadge.textContent = `${Math.round(item.similarity * 100)}% MATCH`;
+		} else if (simBadge) {
+			simBadge.remove();
+		}
+
+		const dateSpan = node.querySelector(".meta-date");
+
+		if (dateSpan) {
+			dateSpan.textContent = formatDate(item.timestamp);
+		}
+
+		const sizeSpan = node.querySelector(".meta-size");
+
+		if (sizeSpan) {
+			sizeSpan.textContent = `${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}`;
+		}
+	}
+
+	function openModal(hash) {
+		const item = State.cache.get(hash);
+
+		if (!item) {
+			return;
+		}
+
+		const isVideo = VideoExtensions.includes(item.extension);
+		$modalViewContent.innerHTML = "";
+		$modalViewContent.style.width = "";
+
+		let media;
+
+		const meta = document.createElement("div");
+
+		meta.className = "media-meta";
+
+		const updateMeta = () => {
+			const nw = isVideo ? media.videoWidth : media.naturalWidth,
+				nh = isVideo ? media.videoHeight : media.naturalHeight,
+				rect = media.getBoundingClientRect();
+
+			if (rect.width > 0) {
+				$modalViewContent.style.width = `${Math.ceil(rect.width) + 2}px`;
+			}
+
+			if (nw && nh) {
+				const tag = getResolutionTag(nw, nh);
+
+				meta.textContent = `${tag ? `${tag} // ` : ""}${nw}x${nh} // ${formatBytes(item.size)}`;
+			}
+		};
+
+		if (isVideo) {
+			media = document.createElement("video");
+
+			media.src = item.url;
+			media.volume = State.volume;
+			media.controls = true;
+			media.autoplay = true;
+
+			media.addEventListener("volumechange", () => {
+				State.volume = media.volume;
+
+				localStorage.setItem(VolumeKey, State.volume);
+			});
+
+			media.addEventListener("loadeddata", updateMeta);
+		} else {
+			media = document.createElement("img");
+
+			media.src = item.url;
+
+			media.addEventListener("load", updateMeta);
+		}
+
+		$modalViewContent.append(media, meta);
+
+		if (item.caption) {
+			const caption = document.createElement("div");
+
+			caption.className = "caption";
+			caption.textContent = item.caption;
+
+			$modalViewContent.appendChild(caption);
+		}
+
+		$modalView.classList.remove("hidden");
+	}
+
+	function closeModals() {
+		$modalTag.classList.add("hidden");
+		$modalView.classList.add("hidden");
+
+		$modalViewContent.innerHTML = "";
+	}
+
+	function viewTagModal(hash) {
+		const item = State.cache.get(hash),
+			node = document.getElementById(`echo-${hash}`);
+
+		if (!item || node?.classList.contains("processing")) {
+			return;
+		}
+
+		$modalTag.classList.remove("hidden");
+		$modalTag.dataset.hash = hash;
+		$tagSelect.value = item.safety || "auto";
+	}
+
+	async function fetchServerInfo() {
+		try {
+			const response = await fetch("/info"),
+				data = await response.json();
+
+			if (!data?.version) {
+				throw new Error("invalid response");
+			}
+
+			$versionTags.forEach(tag => {
+				tag.textContent = data.version;
+			});
+
+			if (data.queries) {
+				$searchWrapper.classList.remove("hidden");
+			}
+
+			if (!data.blur) {
+				State.config.noBlur = true;
+			}
+
+			if (data.ignore?.length) {
+				State.config.ignoreSafety = data.ignore;
+			}
+		} catch (err) {
+			console.error(`Failed to fetch info: ${err}`);
+		}
+	}
+
+	async function verifyToken(token) {
+		try {
+			const response = await fetchWithAuth("/verify", token);
+
+			if (response.status !== 200) {
+				throw new Error("Unauthorized");
+			}
+
+			State.token = token;
+
+			localStorage.setItem(StorageKey, token);
+
+			switchView("dashboard");
+
+			loadEchos().then(setupSSE);
+		} catch {
+			logout(false);
+
+			$loginError.classList.remove("hidden");
+		}
+	}
+
+	function logout(clearUi) {
+		State.token = null;
+		State.page = 1;
+		State.hasMore = true;
+		State.query = "";
+		State.cache.clear();
+
+		$searchInput.value = "";
+
+		localStorage.removeItem(StorageKey);
+
+		if (clearUi) {
+			$gallery.innerHTML = "";
+
+			$loginError.classList.add("hidden");
+		}
+
+		switchView("login");
+	}
+
+	async function loadEchos() {
+		if (!State.hasMore || State.busy > 0) {
+			return;
+		}
+
+		State.controllers.query?.abort();
+		State.controllers.query = new AbortController();
+
+		$loader.classList.remove("hidden");
+
+		let aborted = false;
+
+		try {
+			const endpoint = State.query ? `/query/${State.page}?q=${encodeURIComponent(State.query)}` : `/echos/${State.page}`;
+
+			const response = await fetchWithAuth(endpoint, null, {
+				signal: State.controllers.query.signal,
+			});
+
+			if (!response.ok) {
+				throw new Error(await parseResponseError(response));
+			}
+
+			const data = await response.json();
+
+			if (data?.echos?.length) {
+				$emptyState.classList.add("hidden");
+
+				State.stats.size = data.size || 0;
+				State.stats.count = data.count || 0;
+
+				updateStatsUI();
+
+				renderBatch(data.echos, "append");
+
+				State.page++;
+			} else {
+				State.hasMore = false;
+
+				if (State.page === 1) {
+					$emptyState.classList.remove("hidden");
+				}
+			}
+		} catch (error) {
+			aborted = State.controllers.query.signal.aborted;
+
+			if (!aborted) {
+				showNotification(error.message, "error");
+			}
+		} finally {
+			State.controllers.query = null;
+
+			if (!aborted) {
+				$loader.classList.add("hidden");
+			}
+		}
+	}
+
+	async function handleUpload(file) {
+		State.busy++;
+
+		const formData = new FormData();
+
+		formData.append("upload", file);
+
+		$uploadBtn.textContent = "UPLOADING...";
+		$uploadBtn.disabled = true;
+
+		try {
+			const response = await fetchWithAuth("/upload?return", null, {
+				method: "POST",
+				body: formData,
+			});
+
+			if (!response.ok) {
+				throw new Error(await parseResponseError(response));
+			}
+
+			const data = await response.json();
+
+			if (!data) {
+				throw new Error("invalid response");
+			}
+
+			$emptyState.classList.add("hidden");
+
+			renderBatch(data.echo, "prepend");
+
+			showNotification("Upload complete", "success");
+		} catch (err) {
+			showNotification(err.message, "error");
+		} finally {
+			$uploadBtn.textContent = "UPLOAD_FILE";
+			$uploadBtn.disabled = false;
+
+			$fileInput.value = "";
+
+			State.busy--;
+		}
+	}
+
+	async function updateTag(hash, tag) {
+		const node = document.getElementById(`echo-${hash}`);
+
+		if (!node || node.classList.contains("processing")) {
+			return;
+		}
+
+		closeModals();
+
+		State.busy++;
+
+		node.classList.add("processing");
+
+		let body;
+
+		if (tag === "auto") {
+			body = {
+				action: "re_tag",
+			};
+		} else {
+			body = {
+				action: "set_safety",
+				safety: tag,
+			};
+		}
+
+		try {
+			const response = await fetchWithAuth(`/echos/${hash}`, null, {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(body),
+			});
+
+			if (!response.ok) {
+				throw new Error(await parseResponseError(response));
+			}
+
+			const data = await response.json();
+
+			if (!data) {
+				throw new Error("invalid response");
+			}
+
+			renderBatch(data.echo, "update");
+
+			const newTag = data.echo.safety || "ok",
+				ignored = newTag !== "ok" && (State.config.noBlur || State.config.ignoreSafety.includes(newTag));
+
+			showNotification(`Re-Tag: ${newTag} ${ignored ? "(ignored)" : ""}`, "success");
+		} catch (err) {
+			showNotification(err.message, "error");
+		} finally {
+			node.classList.remove("processing");
+
+			State.busy--;
+		}
+	}
+
+	async function deleteEcho(hash, noConfirm) {
+		const node = document.getElementById(`echo-${hash}`);
+
+		if (!node || node.classList.contains("processing")) {
+			return;
+		}
+
+		if (!noConfirm && !confirm("Delete this echo?")) {
+			return;
+		}
+
+		State.busy++;
+
+		node.classList.add("processing");
+
+		try {
+			const response = await fetchWithAuth(`/echos/${hash}`, null, {
+				method: "DELETE",
+			});
+
+			if (!response.ok) {
+				throw new Error(await parseResponseError(response));
+			}
+
+			removeLocalEcho(hash);
+
+			showNotification("Echo deleted", "success");
+		} catch (error) {
+			node.classList.remove("processing");
+
+			showNotification(error.message, "error");
+		} finally {
+			State.busy--;
+		}
+	}
+
+	function removeLocalEcho(hash) {
+		const item = State.cache.get(hash),
+			node = document.getElementById(`echo-${hash}`);
+
+		if (item) {
+			State.cache.delete(hash);
+		}
+
+		if (node) {
+			node.remove();
+		}
+
+		if ($gallery.children.length === 0) {
+			$emptyState.classList.remove("hidden");
+		}
+	}
+
+	function handleServerEvent(data) {
+		if (!data || typeof data.type === "undefined") {
+			return;
+		}
+
+		const { type, echo, hash, size, count } = data,
+			targetHash = hash || echo?.hash;
+
+		if (typeof size === "number" && typeof count === "number") {
+			State.stats.size = data.size || 0;
+			State.stats.count = data.count || 0;
+
+			updateStatsUI();
+		}
+
+		switch (type) {
+			case 0: // Create
+				if (State.controllers.query || State.query) {
+					return;
+				}
+
+				if (echo) {
+					renderBatch(echo, "prepend");
+				}
+
+				break;
+
+			case 1: // Update
+				if (State.cache.has(targetHash) && echo) {
+					renderBatch(echo, "update");
+				}
+
+				break;
+
+			case 2: // Delete
+				removeLocalEcho(targetHash);
+
+				break;
+		}
+	}
+
+	async function setupSSE() {
+		try {
+			const response = await fetchWithAuth("/echo", null);
+
+			if (!response.ok) {
+				throw new Error(response.statusText);
+			}
+
+			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+			let buffer = "";
+
+			while (true) {
+				const { value, done } = await reader.read();
+
+				if (done) {
+					break;
+				}
+
+				buffer += value;
+
+				const lines = buffer.split("\n");
+
+				buffer = lines.pop();
+
+				for (const line of lines) {
+					if (!line || line === "ping") {
+						continue;
+					}
+
+					try {
+						handleServerEvent(JSON.parse(line));
+					} catch (err) {
+						console.warn(`SSE Parse error: ${err}`);
+					}
+				}
+			}
+		} catch (err) {
+			console.warn(`SSE error: ${err}, retrying...`);
+
+			setTimeout(setupSSE, 3000);
+		}
+	}
+
+	async function fetchWithAuth(url, tokenOverride, options = {}) {
+		const token = tokenOverride || State.token,
+			headers = options.headers || {};
+
+		headers["Authorization"] = `Bearer ${token}`;
+
+		options.headers = headers;
+
+		return fetch(url, options);
+	}
+
+	async function parseResponseError(res) {
+		try {
+			const data = await res.json();
+
+			return data.error || res.statusText;
+		} catch {
+			return res.statusText || "unknown network error";
+		}
+	}
+
 	function formatBytes(bytes) {
 		if (bytes === 0) {
 			return "0 B";
 		}
-
 		const k = 1000,
 			sizes = ["B", "kB", "MB", "GB", "TB"];
-
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
-
 		return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 	}
 
@@ -106,22 +815,21 @@
 		if (bytes === 0) {
 			return "0 B";
 		}
-
 		const k = 1000,
 			sizes = ["B", "kB", "MB", "GB", "TB"];
 
 		const parts = [];
 
 		for (let x = sizes.length - 1; x >= 0; x--) {
-			const mult = Math.pow(k, x);
+			const multiplier = Math.pow(k, x);
 
-			if (bytes < mult) {
+			if (bytes < multiplier) {
 				continue;
 			}
 
-			const amount = Math.floor(bytes / mult);
+			const amount = Math.floor(bytes / multiplier);
 
-			bytes -= amount * mult;
+			bytes -= amount * multiplier;
 
 			parts.push(`${amount} ${sizes[x]}`);
 		}
@@ -134,26 +842,20 @@
 			return "";
 		}
 
-		const date = new Date(timestamp * 1000);
-
-		return date.toISOString().split("T")[0];
+		return new Date(timestamp * 1000).toISOString().split("T")[0];
 	}
 
-	function formatDuration(seconds) {
-		if (!Number.isFinite(seconds) || seconds <= 0) {
+	function formatDuration(sec) {
+		if (!Number.isFinite(sec) || sec <= 0) {
 			return "0s";
 		}
 
-		seconds = Math.floor(seconds);
+		sec = Math.floor(sec);
 
-		const m = Math.floor(seconds / 60),
-			s = seconds % 60;
+		const m = Math.floor(sec / 60),
+			s = sec % 60;
 
-		if (m > 0) {
-			return `${m}m${s}s`;
-		}
-
-		return `${s}s`;
+		return m > 0 ? `${m}m${s}s` : `${s}s`;
 	}
 
 	function getResolutionTag(w, h) {
@@ -183,521 +885,23 @@
 		return match ? match[1] : "";
 	}
 
-	function showNotification(message, type = "info") {
-		const toast = document.createElement("div");
-
-		toast.className = `notification ${type}`;
-		toast.textContent = message;
-
-		$notifyArea.appendChild(toast);
-
-		setTimeout(() => {
-			toast.classList.add("fade-out");
-
-			toast.addEventListener("animationend", () => {
-				toast.remove();
-			});
-		}, 3000);
-	}
-
-	function switchView(viewName) {
-		$loginView.classList.add("hidden");
-		$dashboardView.classList.add("hidden");
-
-		if (viewName === "login") {
-			$loginView.classList.remove("hidden");
-		} else {
-			$dashboardView.classList.remove("hidden");
-		}
-	}
-
-	function updateTotalSize() {
-		$totalSize.textContent = formatBytes(totalSize);
-		$totalSize.title = formatBytesFull(totalSize);
-
-		$totalCount.textContent = totalCount.toLocaleString();
-	}
-
-	async function fetchInfo() {
-		try {
-			const response = await fetch("/info"),
-				data = await response.json();
-
-			if (!data?.version) {
-				throw new Error("invalid response");
-			}
-
-			$versionTags.forEach(tag => {
-				tag.textContent = data.version;
-			});
-
-			if (data.queries) {
-				searchEnabled = true;
-
-				$searchWrapper.classList.remove("hidden");
-			}
-
-			if (!data.blur) {
-				noBlur = true;
-			}
-
-			if (data.ignore?.length) {
-				ignoreSafety = data.ignore;
-			}
-		} catch (err) {
-			console.error(`Failed to fetch version: ${err}`);
-		}
-	}
-
-	async function verifyToken(token) {
-		try {
-			const response = await fetchWithAuth("/verify", token);
-
-			if (response.status !== 200) {
-				throw new Error("Unauthorized");
-			}
-
-			authToken = token;
-
-			localStorage.setItem(StorageKey, token);
-
-			switchView("dashboard");
-
-			loadEchos().then(setupSSE);
-		} catch {
-			logout(false);
-
-			$loginError.classList.remove("hidden");
-		}
-	}
-
-	function logout(clearUi) {
-		authToken = null;
-		currentPage = 1;
-		hasMore = true;
-		currentQuery = "";
-		$searchInput.value = "";
-		echoCache.clear();
-
-		localStorage.removeItem(StorageKey);
-
-		if (clearUi) {
-			$gallery.innerHTML = "";
-
-			$loginError.classList.add("hidden");
-		}
-
-		switchView("login");
-	}
-
-	async function fetchWithAuth(url, tokenOverride, options) {
-		const token = tokenOverride || authToken,
-			opts = options || {},
-			headers = opts.headers || {};
-
-		headers["Authorization"] = `Bearer ${token}`;
-
-		opts.headers = headers;
-
-		return fetch(url, opts);
-	}
-
-	async function parseResponseError(response) {
-		try {
-			const data = await response.json();
-
-			return data.error || response.statusText;
-		} catch {
-			return response.statusText || "unknown network error";
-		}
-	}
-
-	async function loadEchos() {
-		if (!hasMore || isBusy > 0) {
-			return;
-		}
-
-		queryController?.abort();
-
-		queryController = new AbortController();
-
-		$loader.classList.remove("hidden");
-
-		let aborted;
-
-		try {
-			let endpoint;
-
-			if (currentQuery) {
-				endpoint = `/query/${currentPage}?q=${encodeURIComponent(currentQuery)}`;
-			} else {
-				endpoint = `/echos/${currentPage}`;
-			}
-
-			const response = await fetchWithAuth(endpoint, null, {
-				signal: queryController.signal,
-			});
-
-			if (!response.ok) {
-				const msg = await parseResponseError(response);
-
-				throw new Error(msg);
-			}
-
-			const data = await response.json();
-
-			if (!data || !data?.echos?.length) {
-				hasMore = false;
-
-				if (currentPage === 1) {
-					$emptyState.classList.remove("hidden");
-				}
-			} else {
-				$emptyState.classList.add("hidden");
-
-				totalSize = data.size || 0;
-				totalCount = data.count || 0;
-
-				updateTotalSize();
-
-				renderItems(data.echos, false);
-
-				currentPage++;
-			}
-		} catch (error) {
-			aborted = queryController.signal.aborted;
-
-			if (!aborted) {
-				showNotification(error.message, "error");
-			}
-		} finally {
-			queryController = null;
-
-			if (!aborted) {
-				$loader.classList.add("hidden");
-			}
-		}
-	}
-
-	function renderItems(items, prepend) {
-		const fragment = document.createDocumentFragment(),
-			list = Array.isArray(items) ? items : [items];
-
-		list.forEach(item => {
-			const id = `echo-${item.hash}`,
-				ext = item.extension,
-				url = item.url,
-				isVideo = VideoExtensions.includes(ext);
-
-			// Card container
-			const card = document.createElement("div");
-
-			card.id = id;
-			card.className = "echo-card";
-			card.dataset.hash = item.hash;
-
-			if (!noBlur && item.safety && item.safety !== "ok" && !ignoreSafety.includes(item.safety)) {
-				card.classList.add("blurred", `safety-${item.safety}`);
-			}
-
-			// Link container
-			const link = document.createElement("a");
-
-			link.href = url;
-			link.target = "_blank";
-			link.className = "echo-link";
-
-			// Loader
-			const loader = document.createElement("div");
-
-			loader.className = "media-loader";
-
-			const spinner = document.createElement("span");
-
-			spinner.className = "spinner";
-
-			loader.appendChild(spinner);
-
-			link.appendChild(loader);
-
-			const onLoad = () => {
-				if (loader.parentNode) {
-					loader.remove();
-				}
-
-				media.classList.add("loaded");
-			};
-
-			const onError = () => {
-				if (loader.parentNode) {
-					loader.remove();
-				}
-
-				const errorState = document.createElement("div");
-
-				errorState.className = "media-error";
-
-				errorState.textContent = "FAILED";
-
-				link.appendChild(errorState);
-			};
-
-			// Media element
-			let media;
-
-			if (isVideo) {
-				media = document.createElement("video");
-
-				media.className = "echo-media";
-				media.muted = true;
-				media.loop = true;
-
-				// Video Badge
-				const badge = document.createElement("div");
-
-				badge.className = "type-badge";
-				badge.textContent = "▶";
-
-				card.appendChild(badge);
-
-				media.addEventListener("loadeddata", () => {
-					badge.textContent = formatDuration(media.duration);
-
-					onLoad();
-				});
-
-				media.addEventListener("error", onError);
-
-				card.addEventListener("mouseenter", () => {
-					media.play();
-				});
-
-				card.addEventListener("mouseleave", () => {
-					media.pause();
-					media.currentTime = 0;
-				});
-
-				media.src = url;
-			} else {
-				media = document.createElement("img");
-
-				media.className = "echo-media";
-				media.loading = "lazy";
-
-				media.addEventListener("load", onLoad);
-				media.addEventListener("error", onError);
-
-				media.src = url;
-			}
-
-			link.appendChild(media);
-
-			card.appendChild(link);
-
-			// Similarity
-			if (item.similarity) {
-				const similarity = document.createElement("div"),
-					percentage = Math.round(item.similarity * 100);
-
-				similarity.className = "echo-similarity";
-
-				similarity.textContent = `${percentage}% MATCH`;
-
-				card.appendChild(similarity);
-			}
-
-			// Actions container
-			const actions = document.createElement("div");
-
-			actions.className = "echo-actions";
-
-			const tagBtn = document.createElement("button");
-
-			tagBtn.className = "action-btn";
-
-			tagBtn.dataset.action = "tag";
-			tagBtn.dataset.hash = item.hash;
-
-			tagBtn.textContent = "TAG";
-
-			const copyBtn = document.createElement("button");
-
-			copyBtn.className = "action-btn";
-
-			copyBtn.dataset.action = "copy";
-			copyBtn.dataset.hash = item.hash;
-
-			copyBtn.textContent = "COPY";
-
-			const deleteBtn = document.createElement("button");
-
-			deleteBtn.className = "action-btn delete";
-			deleteBtn.dataset.action = "delete";
-			deleteBtn.dataset.hash = item.hash;
-
-			deleteBtn.textContent = "DEL";
-
-			actions.append(tagBtn, copyBtn, deleteBtn);
-
-			// Info container
-			const info = document.createElement("div");
-
-			info.className = "echo-info";
-
-			// Date
-			const dateSpan = document.createElement("span");
-
-			dateSpan.textContent = formatDate(item.timestamp);
-
-			// Size
-			const sizeSpan = document.createElement("span");
-
-			sizeSpan.textContent = `${formatBytes(item.upload_size)} 🡒 ${formatBytes(item.size)}`;
-
-			info.append(dateSpan, sizeSpan);
-
-			// Assemble card
-			card.append(actions, info);
-
-			const exists = document.getElementById(id);
-
-			if (exists) {
-				exists.replaceWith(card);
-			} else {
-				fragment.appendChild(card);
-			}
-
-			item.el = card;
-
-			echoCache.set(item.hash, item);
-		});
-
-		if (prepend) {
-			$gallery.prepend(fragment);
-		} else {
-			$gallery.appendChild(fragment);
-		}
-	}
-
-	function openModal(hash) {
-		const item = echoCache.get(hash);
+	async function copyLink(hash, btn) {
+		const item = State.cache.get(hash);
 
 		if (!item) {
 			return;
 		}
 
-		const ext = item.extension,
-			url = item.url,
-			isVideo = VideoExtensions.includes(ext);
-
-		$modalViewContent.innerHTML = "";
-		$modalViewContent.style.width = "";
-
-		let media, meta;
-
-		const updateMeta = () => {
-			const nw = isVideo ? media.videoWidth : media.naturalWidth,
-				nh = isVideo ? media.videoHeight : media.naturalHeight,
-				rect = media.getBoundingClientRect();
-
-			if (rect.width > 0) {
-				$modalViewContent.style.width = `${Math.ceil(rect.width) + 2}px`;
-			}
-
-			if (nw && nh && rect.width > 0) {
-				const tag = getResolutionTag(nw, nh);
-
-				meta.textContent = `${tag ? `${tag} // ` : ""}${nw}x${nh} // ${formatBytes(item.size)}`;
-			}
-		};
-
-		if (isVideo) {
-			media = document.createElement("video");
-
-			media.src = url;
-
-			media.volume = globalVolume;
-			media.controls = true;
-			media.autoplay = true;
-
-			media.addEventListener("volumechange", () => {
-				localStorage.setItem(VolumeKey, media.volume);
-			});
-
-			media.addEventListener("loadeddata", updateMeta);
-		} else {
-			media = document.createElement("img");
-
-			media.src = url;
-
-			media.addEventListener("load", updateMeta);
-		}
-
-		$modalViewContent.appendChild(media);
-
-		// Meta Badge
-		meta = document.createElement("div");
-
-		meta.className = "media-meta";
-
-		$modalViewContent.appendChild(meta);
-
-		if (item.caption) {
-			const caption = document.createElement("div");
-
-			caption.className = "caption";
-
-			caption.textContent = item.caption;
-
-			$modalViewContent.appendChild(caption);
-		}
-
-		$modalView.classList.remove("hidden");
-	}
-
-	function closeModals() {
-		$modalTag.classList.add("hidden");
-
-		$modalView.classList.add("hidden");
-		$modalViewContent.innerHTML = "";
-	}
-
-	function handleSearch(query) {
-		const normalized = query.trim();
-
-		if (normalized === currentQuery) {
-			return;
-		}
-
-		currentQuery = normalized;
-
-		currentPage = 1;
-		hasMore = true;
-		$gallery.innerHTML = "";
-		echoCache.clear();
-
-		loadEchos();
-	}
-
-	async function copyLink(hash, btnElement) {
-		const item = echoCache.get(hash);
-
-		if (!item) {
-			return;
-		}
-
-		const url = item.url;
-
 		try {
-			await navigator.clipboard.writeText(url);
+			await navigator.clipboard.writeText(item.url);
 
-			if (btnElement) {
-				const originalText = btnElement.textContent;
+			if (btn) {
+				const txt = btn.textContent;
 
-				btnElement.textContent = "COPIED";
+				btn.textContent = "COPIED";
 
 				setTimeout(() => {
-					btnElement.textContent = originalText;
+					btn.textContent = txt;
 				}, 1000);
 			}
 		} catch {
@@ -705,250 +909,66 @@
 		}
 	}
 
-	async function handleUpload(file) {
-		isBusy++;
-
-		const formData = new FormData();
-
-		formData.append("upload", file);
-
-		$uploadBtn.textContent = "UPLOADING...";
-		$uploadBtn.disabled = true;
-
-		try {
-			const response = await fetchWithAuth("/upload?return", null, {
-				method: "POST",
-				body: formData,
-			});
-
-			if (!response.ok) {
-				const msg = await parseResponseError(response);
-
-				throw new Error(msg);
-			}
-
-			const data = await response.json();
-
-			if (!data) {
-				throw new Error("invalid response");
-			}
-
-			totalSize += data.echo.size;
-			totalCount++;
-
-			updateTotalSize();
-
-			$emptyState.classList.add("hidden");
-
-			renderItems(data.echo, true);
-
-			showNotification("Upload complete", "success");
-		} catch (err) {
-			showNotification(err.message, "error");
-		} finally {
-			$uploadBtn.textContent = "UPLOAD_FILE";
-			$uploadBtn.disabled = false;
-
-			$fileInput.value = "";
-
-			isBusy--;
-		}
-	}
-
-	async function viewTagModal(hash) {
-		const item = echoCache.get(hash);
-
-		if (!item || item.el.classList.contains("processing")) {
-			return;
-		}
-
-		$modalTag.classList.remove("hidden");
-		$modalTag.dataset.hash = hash;
-
-		if (item.safety) {
-			$tagSelect.value = item.safety;
-		} else {
-			$tagSelect.value = "auto";
-		}
-	}
-
-	async function updateTag(hash, tag) {
-		const item = hash ? echoCache.get(hash) : null;
-
-		if (!item || item.el.classList.contains("processing")) {
-			return;
-		}
-
-		closeModals();
-
-		isBusy++;
-
-		item.el.classList.add("processing");
-
-		let body;
-
-		if (tag === "auto") {
-			body = {
-				action: "re_tag",
-			};
-		} else {
-			body = {
-				action: "set_safety",
-				safety: tag,
-			};
-		}
-
-		try {
-			const response = await fetchWithAuth(`/echos/${hash}`, null, {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(body),
-			});
-
-			if (!response.ok) {
-				const msg = await parseResponseError(response);
-
-				throw new Error(msg);
-			}
-
-			const data = await response.json();
-
-			if (!data) {
-				throw new Error("invalid response");
-			}
-
-			totalSize = data.size || 0;
-			totalCount = data.count || 0;
-
-			updateTotalSize();
-
-			renderItems(data.echo, false);
-
-			const newTag = data.echo.safety || "ok";
-
-			showNotification(`Re-Tag complete: ${newTag} ${newTag !== "ok" && (noBlur || ignoreSafety.includes(newTag)) ? "(ignored)" : ""}`, "success");
-		} catch (err) {
-			showNotification(err.message, "error");
-		} finally {
-			item.el.classList.remove("processing");
-
-			isBusy--;
-		}
-	}
-
-	function deleteLocalEcho(hash) {
-		const item = echoCache.get(hash);
-
-		if (!item) {
-			return;
-		}
-
-		item.el.remove();
-
-		totalSize -= item.size;
-		totalCount--;
-
-		updateTotalSize();
-
-		echoCache.delete(hash);
-	}
-
-	async function deleteEcho(hash, noConfirm = false) {
-		const item = echoCache.get(hash);
-
-		if (!item || item.el.classList.contains("processing")) {
-			return;
-		}
-
-		if (!noConfirm && !confirm("Delete this echo?")) {
-			return;
-		}
-
-		isBusy++;
-
-		item.el.classList.add("processing");
-
-		try {
-			const response = await fetchWithAuth(`/echos/${hash}`, null, {
-				method: "DELETE",
-			});
-
-			if (!response.ok) {
-				const msg = await parseResponseError(response);
-
-				throw new Error(msg);
-			}
-
-			deleteLocalEcho(hash);
-
-			if ($gallery.children.length === 0) {
-				$emptyState.classList.remove("hidden");
-			}
-
-			showNotification("Echo deleted", "success");
-		} catch (error) {
-			showNotification(error.message, "error");
-		} finally {
-			item.el.classList.remove("processing");
-
-			isBusy--;
-		}
-	}
-
 	function setupEvents() {
+		// Auth
 		$loginForm.addEventListener("submit", event => {
 			event.preventDefault();
 
 			verifyToken($apiToken.value);
 		});
 
-		$logoutBtn.addEventListener("click", () => {
-			logout(true);
-		});
+		$logoutBtn.addEventListener("click", () => logout(true));
 
-		let timeout;
+		// Search
+		let debounceTimer;
 
-		$searchInput.addEventListener("keydown", event => {
-			if (event.key === "Enter") {
-				clearTimeout(timeout);
+		const executeSearch = val => {
+			const query = val.trim();
 
-				handleSearch(event.target.value);
-
-				$searchInput.blur();
-			} else if (event.key === "Escape") {
-				clearTimeout(timeout);
-
-				$searchInput.value = "";
-
-				handleSearch("");
-
-				$searchInput.blur();
-			}
-		});
-
-		const debounce = () => {
-			clearTimeout(timeout);
-
-			if (isBusy > 0) {
-				setTimeout(debounce, 500);
-
+			if (query === State.query) {
 				return;
 			}
 
-			timeout = setTimeout(() => {
-				timeout = null;
+			$gallery.innerHTML = "";
 
-				handleSearch($searchInput.value);
-			}, 500);
+			State.query = query;
+			State.page = 1;
+			State.hasMore = true;
+			State.cache.clear();
+
+			loadEchos();
 		};
 
-		$searchInput.addEventListener("input", () => {
-			debounce();
+		$searchInput.addEventListener("keydown", event => {
+			if (event.key === "Enter") {
+				clearTimeout(debounceTimer);
+
+				executeSearch(e.target.value);
+
+				event.target.blur();
+			} else if (event.key === "Escape") {
+				clearTimeout(debounceTimer);
+
+				$searchInput.value = "";
+
+				executeSearch("");
+
+				event.target.blur();
+			}
 		});
 
-		$gallery.addEventListener("click", async event => {
+		$searchInput.addEventListener("input", () => {
+			clearTimeout(debounceTimer);
+
+			if (State.busy > 0) {
+				return;
+			}
+
+			debounceTimer = setTimeout(() => executeSearch($searchInput.value), 500);
+		});
+
+		// Gallery Delegation
+		$gallery.addEventListener("click", event => {
 			const target = event.target,
 				btn = target.closest("button"),
 				link = target.closest(".echo-link");
@@ -957,15 +977,10 @@
 				event.preventDefault();
 				event.stopPropagation();
 
-				const action = btn.dataset.action,
-					hash = btn.dataset.hash;
+				const { action, hash } = btn.dataset;
 
 				if (action === "tag") {
-					if (event.shiftKey) {
-						updateTag(hash, "auto");
-					} else {
-						viewTagModal(hash);
-					}
+					event.shiftKey ? updateTag(hash, "auto") : viewTagModal(hash);
 				} else if (action === "copy") {
 					copyLink(hash, btn);
 				} else if (action === "delete") {
@@ -988,52 +1003,32 @@
 			}
 		});
 
-		$modalViewBackdrop.addEventListener("click", closeModals);
-		$modalTagBackdrop.addEventListener("click", closeModals);
-
-		document.addEventListener("keydown", event => {
-			if (event.key === "Escape") {
-				closeModals();
-			}
-		});
-
+		// Scroll (Infinite Load)
 		window.addEventListener("scroll", () => {
-			if (authToken && !$dashboardView.classList.contains("hidden")) {
-				const doc = document.documentElement;
-
-				const scrollTop = doc.scrollTop,
-					scrollHeight = doc.scrollHeight,
-					clientHeight = doc.clientHeight;
-
-				if (scrollTop + clientHeight >= scrollHeight - 300) {
-					loadEchos();
-				}
-			}
-		});
-
-		$uploadBtn.addEventListener("click", () => {
-			$fileInput.click();
-		});
-
-		$fileInput.addEventListener("change", event => {
-			const files = event.target.files;
-
-			if (files.length > 0) {
-				handleUpload(files[0]);
-			}
-		});
-
-		$tagCloseBtn.addEventListener("click", () => {
-			closeModals();
-		});
-
-		$tagUpdateBtn.addEventListener("click", async () => {
-			if ($modalTag.classList.contains("hidden")) {
+			if (!State.token || !$dashboardView.classList.contains("hidden") === false) {
 				return;
 			}
 
-			updateTag($modalTag.dataset.hash, $tagSelect.value);
+			const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+
+			if (scrollTop + clientHeight >= scrollHeight - 300) {
+				loadEchos();
+			}
 		});
+
+		// Uploads
+		$uploadBtn.addEventListener("click", () => $fileInput.click());
+
+		$fileInput.addEventListener("change", event => {
+			if (!event.target.files.length) {
+				return;
+			}
+
+			handleUpload(event.target.files[0]);
+		});
+
+		// Drag & Drop
+		let dragCounter = 0;
 
 		window.addEventListener("dragenter", event => {
 			event.preventDefault();
@@ -1057,9 +1052,7 @@
 			}
 		});
 
-		window.addEventListener("dragover", event => {
-			event.preventDefault();
-		});
+		window.addEventListener("dragover", event => event.preventDefault());
 
 		window.addEventListener("drop", event => {
 			event.preventDefault();
@@ -1068,91 +1061,32 @@
 
 			$dropOverlay.classList.add("hidden");
 
-			const files = event.dataTransfer.files;
-
-			if (files.length > 0) {
-				handleUpload(files[0]);
+			if (event.dataTransfer.files.length) {
+				handleUpload(event.dataTransfer.files[0]);
 			}
 		});
-	}
 
-	function handleEvent(data) {
-		const echo = data?.echo,
-			hash = data?.hash || echo?.hash;
+		$modalViewBackdrop.addEventListener("click", closeModals);
 
-		switch (data?.type) {
-			// create
-			case 0:
-				if (queryController) {
-					return;
-				}
+		$modalTagBackdrop.addEventListener("click", closeModals);
 
-				renderItems(echo, true);
+		$tagCloseBtn.addEventListener("click", closeModals);
 
-				break;
-
-			// update
-			case 1:
-				if (queryController || !echoCache.has(hash)) {
-					return;
-				}
-
-				renderItems(echo, false);
-
-				break;
-
-			// delete
-			case 2:
-				deleteLocalEcho(hash);
-
-				break;
-		}
-	}
-
-	async function setupSSE() {
-		try {
-			const response = await fetchWithAuth("/echo", null);
-
-			if (!response.ok) {
-				throw new Error(response.statusText);
+		document.addEventListener("keydown", event => {
+			if (event.key !== "Escape") {
+				return;
 			}
 
-			const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+			closeModals();
+		});
 
-			let buffer = "";
-
-			while (true) {
-				const { value, done } = await reader.read();
-
-				if (done) {
-					break;
-				}
-
-				buffer += value;
-
-				while (true) {
-					const index = buffer.indexOf("\n");
-
-					if (index === -1) {
-						break;
-					}
-
-					const chunk = buffer.slice(0, index);
-
-					buffer = buffer.slice(index + 1);
-
-					if (chunk === "ping") {
-						continue;
-					}
-
-					handleEvent(JSON.parse(chunk));
-				}
+		$tagUpdateBtn.addEventListener("click", () => {
+			if ($modalTag.classList.contains("hidden")) {
+				return;
 			}
-		} catch (err) {
-			console.warn(`SSE error: ${err}`);
 
-			setTimeout(setupSSE, 1000);
-		}
+			updateTag($modalTag.dataset.hash, $tagSelect.value);
+		});
 	}
 
 	init();

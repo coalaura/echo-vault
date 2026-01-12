@@ -114,7 +114,7 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 		return 0
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	client := openrouter.NewClient(config.AI.OpenRouterToken, openrouter.WithXTitle("Echo-Vault"), openrouter.WithHTTPReferer("https://github.com/coalaura/echo-vault"))
