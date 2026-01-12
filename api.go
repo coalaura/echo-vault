@@ -173,12 +173,12 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	count.Add(^uint64(0))
+
 	hub.Broadcast(Event{
 		Type: EventDeleteEcho,
 		Hash: hash,
 	})
-
-	count.Add(^uint64(0))
 
 	okay(w)
 }
