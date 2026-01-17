@@ -379,6 +379,70 @@
 		node.remove();
 	}
 
+	function replaceUploadingNode(uploadId, item) {
+		const placeholder = document.getElementById(`uploading-${uploadId}`);
+
+		State.cache.set(item.hash, item);
+
+		const existingNode = document.getElementById(`echo-${item.hash}`);
+
+		if (existingNode) {
+			updateEchoNode(existingNode, item);
+
+			removeUploadingNode(uploadId);
+
+			return;
+		}
+
+		const realNode = createEchoNode(item);
+
+		updateEchoNode(realNode, item);
+
+		if (!placeholder) {
+			$gallery.prepend(realNode);
+
+			return;
+		}
+
+		const blobMedia = placeholder.querySelector(".echo-media"),
+			realMedia = realNode.querySelector(".echo-media");
+
+		if (blobMedia && realMedia && blobMedia.tagName === "IMG" && realMedia.tagName === "IMG") {
+			const blobUrl = blobMedia.dataset.objectUrl || blobMedia.src,
+				serverUrl = realMedia.src;
+
+			realMedia.src = blobUrl;
+
+			const loader = realNode.querySelector(".media-loader");
+
+			if (loader) {
+				loader.remove();
+			}
+
+			realMedia.classList.add("loaded");
+
+			placeholder.replaceWith(realNode);
+
+			const tmp = new Image();
+
+			tmp.onload = () => {
+				realMedia.src = serverUrl;
+
+				URL.revokeObjectURL(blobUrl);
+			};
+
+			tmp.onerror = () => {
+				URL.revokeObjectURL(blobUrl);
+			};
+
+			tmp.src = serverUrl;
+		} else {
+			placeholder.replaceWith(realNode);
+
+			removeUploadingNode(uploadId);
+		}
+	}
+
 	function updateEchoNode(node, item) {
 		const shouldBlur = !State.config.noBlur && item.safety && item.safety !== "ok" && !State.config.ignoreSafety.includes(item.safety);
 
@@ -646,9 +710,8 @@
 
 		const uploadingNode = createUploadingNode(file, uploadId);
 
-		$gallery.prepend(uploadingNode);
-
 		$emptyState.classList.add("hidden");
+		$gallery.prepend(uploadingNode);
 
 		const formData = new FormData();
 
@@ -673,9 +736,18 @@
 				throw new Error("invalid response");
 			}
 
-			removeUploadingNode(uploadId);
+			// Handle potentially multiple uploads in response, though typically one
+			const items = Array.isArray(data.echo) ? data.echo : [data.echo];
 
-			renderBatch(data.echo, "prepend");
+			if (items.length > 0) {
+				replaceUploadingNode(uploadId, items[0]);
+
+				if (items.length > 1) {
+					renderBatch(items.slice(1), "prepend");
+				}
+			} else {
+				removeUploadingNode(uploadId);
+			}
 
 			showNotification("Upload complete", "success");
 		} catch (err) {
@@ -831,7 +903,12 @@
 				}
 
 				if (echo) {
-					renderBatch(echo, "prepend");
+					// Check if this echo already exists (e.g. added via upload response)
+					const exists = document.getElementById(`echo-${echo.hash}`);
+
+					if (!exists) {
+						renderBatch(echo, "prepend");
+					}
 				}
 
 				break;
