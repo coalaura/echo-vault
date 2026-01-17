@@ -72,6 +72,7 @@
 			query: null,
 			sse: null,
 		},
+		uploadCounter: 0,
 	};
 
 	if (!Number.isFinite(State.volume) || State.volume < 0 || State.volume > 1) {
@@ -280,6 +281,102 @@
 		card.append(actions, info);
 
 		return card;
+	}
+
+	function createUploadingNode(file, uploadId) {
+		const isImage = file.type.startsWith("image/"),
+			isVideo = file.type.startsWith("video/");
+
+		const card = document.createElement("div");
+
+		card.id = `uploading-${uploadId}`;
+		card.className = "echo-card uploading";
+
+		const link = document.createElement("div");
+
+		link.className = "echo-link";
+
+		const overlay = document.createElement("div");
+
+		overlay.className = "upload-overlay";
+		overlay.innerHTML = '<span class="spinner"></span><span class="upload-text">UPLOADING...</span>';
+
+		link.appendChild(overlay);
+
+		if (isImage || isVideo) {
+			const objectUrl = URL.createObjectURL(file);
+
+			let media;
+
+			if (isVideo) {
+				media = document.createElement("video");
+
+				media.className = "echo-media loaded";
+				media.muted = true;
+				media.src = objectUrl;
+
+				const badge = document.createElement("div");
+
+				badge.className = "type-badge";
+				badge.textContent = "▶";
+
+				card.appendChild(badge);
+			} else {
+				media = document.createElement("img");
+
+				media.className = "echo-media loaded";
+				media.src = objectUrl;
+			}
+
+			media.dataset.objectUrl = objectUrl;
+
+			link.appendChild(media);
+		} else {
+			const placeholder = document.createElement("div");
+
+			placeholder.className = "upload-placeholder";
+			placeholder.textContent = file.name.split(".").pop()?.toUpperCase() || "FILE";
+
+			link.appendChild(placeholder);
+		}
+
+		card.appendChild(link);
+
+		const info = document.createElement("div");
+
+		info.className = "echo-info";
+
+		const nameSpan = document.createElement("span");
+
+		nameSpan.className = "meta-date";
+		nameSpan.textContent = "Uploading...";
+
+		const sizeSpan = document.createElement("span");
+
+		sizeSpan.className = "meta-size";
+		sizeSpan.textContent = formatBytes(file.size);
+
+		info.append(nameSpan, sizeSpan);
+
+		card.appendChild(info);
+
+		return card;
+	}
+
+	function removeUploadingNode(uploadId) {
+		const node = document.getElementById(`uploading-${uploadId}`);
+
+		if (!node) {
+			return;
+		}
+
+		const media = node.querySelector("[data-object-url]");
+
+		if (media?.dataset.objectUrl) {
+			URL.revokeObjectURL(media.dataset.objectUrl);
+		}
+
+		node.remove();
 	}
 
 	function updateEchoNode(node, item) {
@@ -545,6 +642,14 @@
 	async function handleUpload(file) {
 		State.busy++;
 
+		const uploadId = ++State.uploadCounter;
+
+		const uploadingNode = createUploadingNode(file, uploadId);
+
+		$gallery.prepend(uploadingNode);
+
+		$emptyState.classList.add("hidden");
+
 		const formData = new FormData();
 
 		formData.append("upload", file);
@@ -568,12 +673,18 @@
 				throw new Error("invalid response");
 			}
 
-			$emptyState.classList.add("hidden");
+			removeUploadingNode(uploadId);
 
 			renderBatch(data.echo, "prepend");
 
 			showNotification("Upload complete", "success");
 		} catch (err) {
+			removeUploadingNode(uploadId);
+
+			if ($gallery.children.length === 0) {
+				$emptyState.classList.remove("hidden");
+			}
+
 			showNotification(err.message, "error");
 		} finally {
 			$uploadBtn.textContent = "UPLOAD_FILE";
@@ -962,7 +1073,7 @@
 			if (event.key === "Enter") {
 				clearTimeout(debounceTimer);
 
-				executeSearch(e.target.value);
+				executeSearch(event.target.value);
 
 				event.target.blur();
 			} else if (event.key === "Escape") {
@@ -1017,6 +1128,10 @@
 				event.preventDefault();
 
 				const card = link.closest(".echo-card");
+
+				if (card?.classList.contains("uploading")) {
+					return;
+				}
 
 				openModal(card.dataset.hash);
 			}

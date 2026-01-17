@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 var limiter atomic.Int32
@@ -191,6 +192,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+
+	time.Sleep(5 * time.Second)
 
 	usage.Add(uint64(echo.Size))
 	count.Add(1)
