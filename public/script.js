@@ -1046,6 +1046,32 @@
 			handleUpload(event.target.files[0]);
 		});
 
+		document.addEventListener("paste", event => {
+			if (event.target.tagName === "INPUT") {
+				return;
+			}
+
+			const items = event.clipboardData?.items;
+
+			if (!items) {
+				return;
+			}
+
+			for (const item of items) {
+				if (item.kind === "file") {
+					const file = item.getAsFile();
+
+					if (file) {
+						event.preventDefault();
+
+						handleUpload(file);
+
+						return;
+					}
+				}
+			}
+		});
+
 		// Drag & Drop
 		let dragCounter = 0;
 
