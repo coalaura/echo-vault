@@ -704,8 +704,6 @@
 	}
 
 	async function handleUpload(file) {
-		State.busy++;
-
 		const uploadId = ++State.uploadCounter;
 
 		const uploadingNode = createUploadingNode(file, uploadId);
@@ -716,9 +714,6 @@
 		const formData = new FormData();
 
 		formData.append("upload", file);
-
-		$uploadBtn.textContent = "UPLOADING...";
-		$uploadBtn.disabled = true;
 
 		try {
 			const response = await fetchWithAuth("/upload?return", null, {
@@ -758,13 +753,6 @@
 			}
 
 			showNotification(err.message, "error");
-		} finally {
-			$uploadBtn.textContent = "UPLOAD_FILE";
-			$uploadBtn.disabled = false;
-
-			$fileInput.value = "";
-
-			State.busy--;
 		}
 	}
 
@@ -1235,7 +1223,9 @@
 				return;
 			}
 
-			handleUpload(event.target.files[0]);
+			Array.from(event.target.files).forEach(handleUpload);
+
+			$fileInput.value = "";
 		});
 
 		document.addEventListener("paste", event => {
@@ -1249,18 +1239,22 @@
 				return;
 			}
 
+			let hasFile = false;
+
 			for (const item of items) {
 				if (item.kind === "file") {
 					const file = item.getAsFile();
 
 					if (file) {
-						event.preventDefault();
+						hasFile = true;
 
 						handleUpload(file);
-
-						return;
 					}
 				}
+			}
+
+			if (hasFile) {
+				event.preventDefault();
 			}
 		});
 
@@ -1299,7 +1293,7 @@
 			$dropOverlay.classList.add("hidden");
 
 			if (event.dataTransfer.files.length) {
-				handleUpload(event.dataTransfer.files[0]);
+				Array.from(event.dataTransfer.files).forEach(handleUpload);
 			}
 		});
 
