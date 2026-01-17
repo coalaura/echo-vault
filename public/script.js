@@ -709,6 +709,7 @@
 		const uploadingNode = createUploadingNode(file, uploadId);
 
 		$emptyState.classList.add("hidden");
+
 		$gallery.prepend(uploadingNode);
 
 		const formData = new FormData();
