@@ -72,7 +72,6 @@
 			query: null,
 			sse: null,
 		},
-		uploadCounter: 0,
 	};
 
 	if (!Number.isFinite(State.volume) || State.volume < 0 || State.volume > 1) {
@@ -80,6 +79,10 @@
 	}
 
 	$searchInput.value = "";
+
+	function generateId() {
+		return Math.random().toString(16).substring(2, 8);
+	}
 
 	async function init() {
 		$notifyArea = document.createElement("div");
@@ -389,7 +392,9 @@
 		if (existingNode) {
 			updateEchoNode(existingNode, item);
 
-			removeUploadingNode(uploadId);
+			if (placeholder) {
+				removeUploadingNode(uploadId);
+			}
 
 			return;
 		}
@@ -704,7 +709,7 @@
 	}
 
 	async function handleUpload(file) {
-		const uploadId = ++State.uploadCounter;
+		const uploadId = generateId();
 
 		const uploadingNode = createUploadingNode(file, uploadId);
 
@@ -717,7 +722,7 @@
 		formData.append("upload", file);
 
 		try {
-			const response = await fetchWithAuth("/upload?return", null, {
+			const response = await fetchWithAuth(`/upload?id=${uploadId}`, null, {
 				method: "POST",
 				body: formData,
 			});
@@ -875,7 +880,7 @@
 			return;
 		}
 
-		const { type, echo, hash, size, count } = data,
+		const { type, echo, hash, size, count, id } = data,
 			targetHash = hash || echo?.hash;
 
 		if (typeof size === "number" && typeof count === "number") {
@@ -892,7 +897,16 @@
 				}
 
 				if (echo) {
-					// Check if this echo already exists (e.g. added via upload response)
+					if (id) {
+						const placeholder = document.getElementById(`uploading-${id}`);
+
+						if (placeholder) {
+							replaceUploadingNode(id, echo);
+
+							return;
+						}
+					}
+
 					const exists = document.getElementById(`echo-${echo.hash}`);
 
 					if (!exists) {

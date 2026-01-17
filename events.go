@@ -15,6 +15,7 @@ const (
 
 type Event struct {
 	Type int    `json:"type"`
+	ID   string `json:"id,omitempty"`
 	Hash string `json:"hash,omitempty"`
 	Echo *Echo  `json:"echo,omitempty"`
 
