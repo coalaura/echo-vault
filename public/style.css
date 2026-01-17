@@ -404,10 +404,6 @@ header {
 	border-color: var(--text-muted);
 }
 
-.echo-card.uploading .echo-media {
-	opacity: 0.6;
-}
-
 .upload-overlay {
 	position: absolute;
 	inset: 0;
