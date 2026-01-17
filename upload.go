@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"time"
 )
 
 var limiter atomic.Int32
@@ -193,8 +193,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(5 * time.Second)
-
 	usage.Add(uint64(echo.Size))
 	count.Add(1)
 
@@ -202,6 +200,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	hub.Broadcast(Event{
 		Type: EventCreateEcho,
+		ID:   getUploadId(r),
 		Echo: echo,
 	})
 
@@ -273,4 +272,20 @@ func formatFactor(ratio float64) string {
 	str = strings.TrimRight(str, ".")
 
 	return str
+}
+
+func getUploadId(r *http.Request) string {
+	query := r.URL.Query()
+	id := query.Get("id")
+
+	if id == "" || len(id) != 6 {
+		return ""
+	}
+
+	_, err := hex.DecodeString(id)
+	if err != nil {
+		return ""
+	}
+
+	return strings.ToLower(id)
 }

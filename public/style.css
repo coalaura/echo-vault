@@ -399,6 +399,7 @@ header {
 	z-index: 41;
 }
 
+/* Uploading State */
 .echo-card.uploading {
 	cursor: default;
 	border-color: var(--text-muted);
