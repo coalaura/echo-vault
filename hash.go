@@ -6,7 +6,7 @@ import (
 	"regexp"
 )
 
-var hashRgx = regexp.MustCompile(`^[0-9A-Z]{10}$`)
+var hashRgx = regexp.MustCompile(`^[0-9A-Za-z]{10}$`)
 
 func (d *EchoDatabase) Hash(ctx context.Context) (string, error) {
 	for {
@@ -26,7 +26,7 @@ func (d *EchoDatabase) Hash(ctx context.Context) (string, error) {
 func generateHash() string {
 	var hash string
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		char := rand.Intn(36) + 48
 
 		if char > 57 {
