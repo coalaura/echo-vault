@@ -202,10 +202,7 @@ func deleteEchoHandler(w http.ResponseWriter, r *http.Request) {
 
 	count.Add(^uint64(0))
 
-	hub.Broadcast(Event{
-		Type: EventDeleteEcho,
-		Hash: hash,
-	})
+	hub.BroadcastDelete(hash)
 
 	okay(w)
 }
@@ -274,10 +271,7 @@ func updateEchoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub.Broadcast(Event{
-		Type: EventUpdateEcho,
-		Echo: echo,
-	})
+	hub.BroadcastUpdate(echo)
 
 	okay(w, "application/json")
 

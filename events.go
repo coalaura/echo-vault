@@ -11,13 +11,15 @@ const (
 	EventCreateEcho = iota
 	EventUpdateEcho
 	EventDeleteEcho
+	EventProcessingEcho
 )
 
 type Event struct {
-	Type int    `json:"type"`
-	ID   string `json:"id,omitempty"`
-	Hash string `json:"hash,omitempty"`
-	Echo *Echo  `json:"echo,omitempty"`
+	Type       int    `json:"type"`
+	ID         string `json:"id,omitempty"`
+	Hash       string `json:"hash,omitempty"`
+	Echo       *Echo  `json:"echo,omitempty"`
+	Processing bool   `json:"processing,omitempty"`
 
 	Size  uint64 `json:"size"`
 	Count uint64 `json:"count"`
@@ -107,6 +109,36 @@ func (h *Hub) Broadcast(event Event) {
 		return
 	case h.broadcast <- b:
 	}
+}
+
+func (h *Hub) BroadcastCreate(id string, echo *Echo) {
+	h.Broadcast(Event{
+		Type: EventCreateEcho,
+		ID:   id,
+		Echo: echo,
+	})
+}
+
+func (h *Hub) BroadcastUpdate(echo *Echo) {
+	h.Broadcast(Event{
+		Type: EventUpdateEcho,
+		Echo: echo,
+	})
+}
+
+func (h *Hub) BroadcastDelete(hash string) {
+	h.Broadcast(Event{
+		Type: EventDeleteEcho,
+		Hash: hash,
+	})
+}
+
+func (h *Hub) BroadcastProcessing(hash string, processing bool) {
+	h.Broadcast(Event{
+		Type:       EventProcessingEcho,
+		Hash:       hash,
+		Processing: processing,
+	})
 }
 
 func (h *Hub) Handle(w http.ResponseWriter, r *http.Request) {

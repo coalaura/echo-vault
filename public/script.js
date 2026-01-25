@@ -60,6 +60,7 @@
 		hasMore: true,
 		query: "",
 		cache: new Map(),
+		processing: new Map(),
 		stats: {
 			size: 0,
 			count: 0,
@@ -182,8 +183,10 @@
 		const card = document.createElement("div");
 
 		card.id = `echo-${item.hash}`;
-		card.className = "echo-card";
+		card.className = `echo-card`;
 		card.dataset.hash = item.hash;
+
+		card.classList.toggle("bg-processing", State.processing.has(item.hash));
 
 		const link = document.createElement("a");
 
@@ -456,6 +459,8 @@
 		if (shouldBlur) {
 			node.classList.add("blurred", `safety-${item.safety}`);
 		}
+
+		node.classList.toggle("bg-processing", State.processing.has(item.hash));
 
 		let simBadge = node.querySelector(".echo-similarity");
 
@@ -935,7 +940,7 @@
 			return;
 		}
 
-		const { type, echo, hash, size, count, id } = data,
+		const { type, echo, hash, size, count, id, processing } = data,
 			targetHash = hash || echo?.hash;
 
 		if (typeof size === "number" && typeof count === "number") {
@@ -946,7 +951,7 @@
 		}
 
 		switch (type) {
-			case 0: // Create
+			case 0: { // Create
 				if (State.controllers.query || State.query) {
 					return;
 				}
@@ -970,18 +975,34 @@
 				}
 
 				break;
-
-			case 1: // Update
+			}
+			case 1: { // Update
 				if (State.cache.has(targetHash) && echo) {
 					renderBatch(echo, "update");
 				}
 
 				break;
-
-			case 2: // Delete
+			}
+			case 2: { // Delete
 				removeLocalEcho(targetHash);
 
 				break;
+			}
+			case 3: { // Processing
+				const node = document.getElementById(`echo-${hash}`);
+
+				if (processing) {
+					State.processing.set(hash, true);
+
+					node?.classList?.add("bg-processing");
+				} else {
+					State.processing.delete(hash);
+
+					node?.classList?.remove("bg-processing");
+				}
+
+				break;
+			}
 		}
 	}
 
