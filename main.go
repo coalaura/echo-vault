@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"sync/atomic"
-	"time"
 
 	"github.com/coalaura/plain"
 	"github.com/go-chi/chi/v5"
@@ -97,6 +96,7 @@ func main() {
 
 		gr.Get("/echo", hub.Handle)
 
+		gr.Get("/echo/{hash}", getEchoHandler)
 		gr.Get("/echos/{page}", listEchosHandler)
 		gr.Get("/query/{page}", queryEchosHandler)
 
@@ -129,10 +129,7 @@ func main() {
 
 	cancelHub()
 
-	shutdown, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	server.Shutdown(shutdown)
+	server.Close()
 }
 
 func getPublicFS() (fs.FS, error) {
