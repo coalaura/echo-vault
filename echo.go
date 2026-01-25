@@ -17,10 +17,10 @@ type Echo struct {
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
 
-	Caption string `json:"caption,omitempty"`
-	Safety  string `json:"safety,omitempty"`
-
+	Safety     string  `json:"safety,omitempty"`
 	Similarity float32 `json:"similarity,omitempty"`
+
+	Description string `json:"-"`
 }
 
 type echoAlias Echo

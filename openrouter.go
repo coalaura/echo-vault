@@ -17,14 +17,9 @@ import (
 	"github.com/revrost/go-openrouter/jsonschema"
 )
 
-type EchoTag struct {
-	Categories []string `json:"categories,omitempty"`
-	Tags       []string `json:"tags,omitempty"`
-	Caption    string   `json:"caption,omitempty"`
-	Text       []string `json:"text,omitempty"`
-	Safety     string   `json:"safety,omitempty"`
-
-	Similarity float32 `json:"similarity,omitempty"`
+type EchoMeta struct {
+	Description string `json:"description"`
+	Safety      string `json:"safety"`
 }
 
 var (
@@ -34,49 +29,13 @@ var (
 	TagSchema = jsonschema.Definition{
 		Type: jsonschema.Object,
 		Properties: map[string]jsonschema.Definition{
-			"categories": {
-				Type:        jsonschema.Array,
-				Description: "1-3 broad categories for filtering/search",
-				Items: &jsonschema.Definition{
-					Type: jsonschema.String,
-					Enum: []string{
-						"game",
-						"desktop",
-						"browser",
-						"code",
-						"terminal",
-						"chat",
-						"media",
-						"document",
-						"data",
-						"map",
-						"photo",
-						"error",
-						"other",
-					},
-				},
-			},
-			"tags": {
-				Type:        jsonschema.Array,
-				Description: "Tags describing the image",
-				Items: &jsonschema.Definition{
-					Type: jsonschema.String,
-				},
-			},
-			"caption": {
+			"description": {
 				Type:        jsonschema.String,
-				Description: "Caption describing the image",
-			},
-			"text": {
-				Type:        jsonschema.Array,
-				Description: "Any text visible in the image (ocr), if applicable",
-				Items: &jsonschema.Definition{
-					Type: jsonschema.String,
-				},
+				Description: "Detailed natural language description optimized for semantic search (150-400 words)",
 			},
 			"safety": {
 				Type:        jsonschema.String,
-				Description: "Safety classification of the image",
+				Description: "Content safety classification",
 				Enum: []string{
 					"ok",
 					"suggestive",
@@ -87,13 +46,7 @@ var (
 				},
 			},
 		},
-		Required: []string{
-			"categories",
-			"tags",
-			"caption",
-			"text",
-			"safety",
-		},
+		Required:             []string{"description", "safety"},
 		AdditionalProperties: false,
 	}
 )
@@ -117,15 +70,19 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	client := openrouter.NewClient(config.AI.OpenRouterToken, openrouter.WithXTitle("Echo-Vault"), openrouter.WithHTTPReferer("https://github.com/coalaura/echo-vault"))
+	client := openrouter.NewClient(
+		config.AI.OpenRouterToken,
+		openrouter.WithXTitle("Echo-Vault"),
+		openrouter.WithHTTPReferer("https://github.com/coalaura/echo-vault"),
+	)
 
 	request := openrouter.ChatCompletionRequest{
 		Model:       config.AI.TaggingModel,
 		Temperature: 0.3,
-		MaxTokens:   256,
+		MaxTokens:   512,
 		Messages: []openrouter.ChatCompletionMessage{
 			openrouter.SystemMessage(TagPrompt),
-			openrouter.UserMessageWithImage("Analyze this image", img),
+			openrouter.UserMessageWithImage("Describe this image for semantic search.", img),
 		},
 		Provider: &openrouter.ChatProvider{
 			DataCollection: openrouter.DataCollectionDeny,
@@ -173,7 +130,7 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 		return cost
 	}
 
-	var result EchoTag
+	var result EchoMeta
 
 	err = json.Unmarshal([]byte(content), &result)
 	if err != nil {
@@ -191,7 +148,7 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 
 	err = vector.Store(e.Hash, result)
 	if err != nil {
-		log.Warnf("[%s] Tag completion invalid: %v\n", e.Hash, err)
+		log.Warnf("[%s] Failed to store vector: %v\n", e.Hash, err)
 
 		return cost
 	}
@@ -203,7 +160,6 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 		return cost
 	}
 
-	e.Caption = result.Caption
 	e.Safety = result.Safety
 
 	if !noLogs {
@@ -235,10 +191,7 @@ func (e *Echo) ReadAsJpegBase64() (string, error) {
 
 	var buf bytes.Buffer
 
-	err = jpeg.Encode(&buf, img, &jpeg.Options{
-		Quality: 90,
-	})
-
+	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90})
 	if err != nil {
 		return "", err
 	}
@@ -248,84 +201,29 @@ func (e *Echo) ReadAsJpegBase64() (string, error) {
 	return fmt.Sprintf("data:image/jpeg;base64,%s", b64), nil
 }
 
-func (t *EchoTag) Clean() error {
-	if len(t.Categories) < 1 {
-		return errors.New("missing categories")
-	} else if len(t.Categories) > 3 {
-		return fmt.Errorf("too many categories: %d", len(t.Categories))
+func (t *EchoMeta) Clean() error {
+	// Description validation
+	t.Description = strings.TrimSpace(t.Description)
+	t.Description = unidecode.Unidecode(t.Description)
+
+	if len(t.Description) < 50 {
+		return errors.New("description too short (min 50 chars)")
 	}
 
-	t.Caption = strings.TrimSpace(t.Caption)
-
-	if len(t.Caption) < 1 {
-		return errors.New("missing caption")
-	} else if len(t.Caption) > 256 {
-		return fmt.Errorf("caption too long: %d", len(t.Caption))
+	if len(t.Description) > 2000 {
+		t.Description = t.Description[:2000]
 	}
 
-	t.Caption = unidecode.Unidecode(t.Caption)
-
+	// Safety validation
 	if !IsValidSafety(t.Safety) {
 		return fmt.Errorf("invalid safety tag: %q", t.Safety)
-	}
-
-	tags := make([]string, 0, len(t.Tags))
-
-	for _, tag := range t.Tags {
-		tag = strings.TrimSpace(tag)
-
-		if len(tag) < 1 || len(tag) > 32 {
-			continue
-		}
-
-		tags = append(tags, unidecode.Unidecode(tag))
-	}
-
-	t.Tags = tags
-
-	if len(t.Tags) < 1 {
-		return errors.New("missing tags")
-	} else if len(t.Tags) > 32 {
-		t.Tags = t.Tags[:32]
-	}
-
-	texts := make([]string, 0, len(t.Text))
-
-	for _, text := range t.Text {
-		text = strings.TrimSpace(text)
-
-		if len(text) < 1 {
-			continue
-		} else if len(text) > 196 {
-			text = text[:196]
-		}
-
-		texts = append(texts, unidecode.Unidecode(text))
-	}
-
-	t.Text = texts
-
-	if len(t.Text) > 16 {
-		t.Text = t.Text[:16]
 	}
 
 	return nil
 }
 
-func (t *EchoTag) Serialize() (string, string, string, string, string) {
-	categories := strings.Join(t.Categories, ",")
-	tags := strings.Join(t.Tags, ",")
-	text := strings.Join(t.Text, "\n")
-
-	return string(categories), string(tags), t.Caption, string(text), t.Safety
-}
-
-func (t *EchoTag) EmbeddingString() string {
-	cats := strings.Join(t.Categories, "\x1E")
-	tags := strings.Join(t.Tags, "\x1E")
-	text := strings.Join(t.Text, "\x1E")
-
-	return cats + "\x1F" + tags + "\x1F" + text
+func (t *EchoMeta) Serialize() (string, string) {
+	return t.Description, t.Safety
 }
 
 func IsValidSafety(safety string) bool {

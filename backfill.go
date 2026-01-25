@@ -22,7 +22,7 @@ func RunBackfill(total uint64) {
 		totalCostMx sync.RWMutex
 		totalCost   float64
 
-		queue = NewQueue(8)
+		queue = NewQueue(4)
 		done  = make(chan bool)
 	)
 
@@ -68,7 +68,7 @@ func RunBackfill(total uint64) {
 		}
 
 		for _, echo := range echos {
-			if !echo.IsImage() || (echo.Safety != "" && vector.Has(echo.Hash)) {
+			if !echo.IsImage() || (echo.Description != "" && vector.Has(echo.Hash)) {
 				completed.Add(1)
 
 				continue

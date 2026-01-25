@@ -96,6 +96,33 @@ func viewEchoHandler(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, file)
 }
 
+func getEchoHandler(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	if !validateHash(hash) {
+		abort(w, http.StatusBadRequest, "invalid hash format")
+
+		log.Warnln("get: invalid hash")
+
+		return
+	}
+
+	echo, err := database.Find(r.Context(), hash)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "database error")
+
+		log.Warnln("get: failed to find echo")
+		log.Warnln(err)
+
+		return
+	}
+
+	okay(w, "application/json")
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"description": echo.Description,
+	})
+}
+
 func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	if page == -1 {

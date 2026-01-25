@@ -494,8 +494,66 @@
 		}
 
 		const isVideo = VideoExtensions.includes(item.extension);
+
 		$modalViewContent.innerHTML = "";
 		$modalViewContent.style.width = "";
+
+		const infoBtn = document.createElement("button");
+
+		infoBtn.className = "media-info-btn";
+		infoBtn.textContent = "INFO";
+		infoBtn.title = "View description";
+
+		const descPanel = document.createElement("div");
+
+		descPanel.className = "media-description closed";
+
+		infoBtn.addEventListener("click", async event => {
+			event.stopPropagation();
+
+			if (!descPanel.classList.contains("closed")) {
+				descPanel.classList.add("closed");
+
+				infoBtn.classList.remove("active");
+
+				return;
+			}
+
+			if (descPanel.dataset.loaded === "true") {
+				descPanel.classList.remove("closed");
+
+				infoBtn.classList.add("active");
+
+				return;
+			}
+
+			infoBtn.classList.add("loading");
+
+			try {
+				const response = await fetchWithAuth(`/echo/${hash}`);
+
+				if (!response.ok) {
+					throw new Error("Failed to load");
+				}
+
+				const data = await response.json();
+
+				if (data?.description) {
+					descPanel.textContent = data.description;
+					descPanel.dataset.loaded = "true";
+
+					descPanel.classList.remove("closed");
+
+					infoBtn.classList.add("active");
+				} else {
+					showNotification("No description available", "info");
+				}
+			} catch {
+				showNotification("Failed to load description", "error");
+			} finally {
+				infoBtn.classList.remove("loading");
+			}
+		});
 
 		let media;
 
@@ -542,16 +600,13 @@
 			media.addEventListener("load", updateMeta);
 		}
 
-		$modalViewContent.append(media, meta);
+		media.addEventListener("click", () => {
+			descPanel.classList.add("closed");
 
-		if (item.caption) {
-			const caption = document.createElement("div");
+			infoBtn.classList.remove("active");
+		});
 
-			caption.className = "caption";
-			caption.textContent = item.caption;
-
-			$modalViewContent.appendChild(caption);
-		}
+		$modalViewContent.append(media, meta, infoBtn, descPanel);
 
 		$modalView.classList.remove("hidden");
 	}

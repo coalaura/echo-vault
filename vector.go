@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 
 	"github.com/philippgille/chromem-go"
 )
@@ -28,7 +29,12 @@ func LoadVectorStore() (*VectorStore, error) {
 		return nil, err
 	}
 
-	embedder := chromem.NewEmbeddingFuncOpenAICompat("https://openrouter.ai/api/v1", config.AI.OpenRouterToken, config.AI.EmbeddingModel, nil)
+	embedder := chromem.NewEmbeddingFuncOpenAICompat(
+		"https://openrouter.ai/api/v1",
+		config.AI.OpenRouterToken,
+		config.AI.EmbeddingModel,
+		nil,
+	)
 
 	collection, err := db.GetOrCreateCollection("tags", nil, embedder)
 	if err != nil {
@@ -48,7 +54,9 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 		return nil, nil
 	}
 
-	results, err := s.collection.Query(ctx, query, amount, nil, nil)
+	enhancedQuery := ExpandQuery(query)
+
+	results, err := s.collection.Query(ctx, enhancedQuery, amount, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +79,10 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 	return hashes, nil
 }
 
-func (s *VectorStore) Store(hash string, entry EchoTag) error {
+func (s *VectorStore) Store(hash string, entry EchoMeta) error {
 	document := chromem.Document{
 		ID:      hash,
-		Content: entry.EmbeddingString(),
+		Content: entry.Description,
 	}
 
 	return s.collection.AddDocument(context.Background(), document)
@@ -89,4 +97,16 @@ func (s *VectorStore) Has(hash string) bool {
 
 func (s *VectorStore) Delete(hash string) error {
 	return s.collection.Delete(context.Background(), nil, nil, hash)
+}
+
+func ExpandQuery(query string) string {
+	query = strings.TrimSpace(query)
+
+	// For very short queries, add context
+	words := strings.Fields(query)
+	if len(words) <= 2 {
+		return "image showing " + query
+	}
+
+	return query
 }
