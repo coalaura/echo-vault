@@ -9,7 +9,7 @@ import (
 
 const ReTagChunkSize = 1024
 
-func RunBackfill(total uint64) {
+func (d *EchoDatabase) Backfill(total uint64) {
 	if config.AI.OpenRouterToken == "" || !config.AI.ReTagEmpty || total == 0 {
 		return
 	}
@@ -62,7 +62,7 @@ func RunBackfill(total uint64) {
 	})
 
 	for {
-		echos, err := database.FindAll(context.Background(), offset, ReTagChunkSize)
+		echos, err := d.FindAll(context.Background(), offset, ReTagChunkSize)
 		if err != nil {
 			break
 		}
@@ -106,6 +106,11 @@ func RunBackfill(total uint64) {
 	close(done)
 
 	wg.Wait()
+
+	err := d.Optimize(10)
+	if err != nil {
+		log.Warnf("Backfill optimization failed: %v\n", err)
+	}
 
 	log.Printf("Verifying tags 100%% (%d of %d)\n", total, total)
 }
