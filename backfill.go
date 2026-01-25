@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,9 +22,8 @@ func RunBackfill(total uint64) {
 		totalCostMx sync.RWMutex
 		totalCost   float64
 
-		workers = min(8, max(4, runtime.NumCPU()))
-		queue   = NewQueue(workers)
-		done    = make(chan bool)
+		queue = NewQueue(8)
+		done  = make(chan bool)
 	)
 
 	log.Printf("Verifying tags 0%% (0 of %d)\n", total)
