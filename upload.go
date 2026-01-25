@@ -198,11 +198,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	timer.Stop("store")
 
-	hub.Broadcast(Event{
-		Type: EventCreateEcho,
-		ID:   getUploadId(r),
-		Echo: echo,
-	})
+	hub.BroadcastCreate(getUploadId(r), echo)
 
 	go echo.GenerateTags(context.Background(), false, false)
 

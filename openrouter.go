@@ -31,7 +31,7 @@ var (
 		Properties: map[string]jsonschema.Definition{
 			"description": {
 				Type:        jsonschema.String,
-				Description: "Detailed natural language description optimized for semantic search (150-400 words)",
+				Description: "Concise visual description for semantic search (50-150 words)",
 			},
 			"safety": {
 				Type:        jsonschema.String,
@@ -60,6 +60,12 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 		log.Debugf("[%s] Tagging...\n", e.Hash)
 	}
 
+	if !noSync {
+		hub.BroadcastProcessing(e.Hash, true)
+
+		defer hub.BroadcastProcessing(e.Hash, false)
+	}
+
 	img, err := e.ReadAsJpegBase64()
 	if err != nil {
 		log.Warnf("[%s] Failed to read echo as jpeg: %v\n", e.Hash, err)
@@ -78,11 +84,11 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 
 	request := openrouter.ChatCompletionRequest{
 		Model:       config.AI.TaggingModel,
-		Temperature: 0.3,
-		MaxTokens:   512,
+		Temperature: 0.2,
+		MaxTokens:   300,
 		Messages: []openrouter.ChatCompletionMessage{
 			openrouter.SystemMessage(TagPrompt),
-			openrouter.UserMessageWithImage("Describe this image for semantic search.", img),
+			openrouter.UserMessageWithImage("Describe this image.", img),
 		},
 		Provider: &openrouter.ChatProvider{
 			DataCollection: openrouter.DataCollectionDeny,
@@ -167,10 +173,7 @@ func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
 	}
 
 	if !noSync {
-		hub.Broadcast(Event{
-			Type: EventUpdateEcho,
-			Echo: e,
-		})
+		hub.BroadcastUpdate(e)
 	}
 
 	return cost
@@ -206,12 +209,12 @@ func (t *EchoMeta) Clean() error {
 	t.Description = strings.TrimSpace(t.Description)
 	t.Description = unidecode.Unidecode(t.Description)
 
-	if len(t.Description) < 50 {
-		return errors.New("description too short (min 50 chars)")
+	if len(t.Description) < 30 {
+		return errors.New("description too short (min 30 chars)")
 	}
 
-	if len(t.Description) > 2000 {
-		t.Description = t.Description[:2000]
+	if len(t.Description) > 1000 {
+		t.Description = t.Description[:1000]
 	}
 
 	// Safety validation

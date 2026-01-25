@@ -374,6 +374,7 @@ header {
 	pointer-events: none;
 }
 
+.echo-card:not(.processing).bg-processing::before,
 .echo-card.processing::before {
 	content: "";
 	position: absolute;
@@ -383,6 +384,18 @@ header {
 	z-index: 40;
 }
 
+.echo-card:not(.processing).bg-processing::before {
+	inset: auto;
+	top: 0;
+	left: 0;
+	width: 4rem;
+	height: 4rem;
+	background: radial-gradient(circle at top left, rgba(0, 0, 0, 0.9) 0%, transparent 70%);
+	backdrop-filter: none;
+	pointer-events: none;
+}
+
+.echo-card:not(.processing).bg-processing::after,
 .echo-card.processing::after {
 	content: "";
 	position: absolute;
@@ -399,7 +412,14 @@ header {
 	z-index: 41;
 }
 
-/* Uploading State */
+.echo-card:not(.processing).bg-processing::after {
+	top: 0.5rem;
+	left: 0.5rem;
+	width: 0.85rem;
+	height: 0.85rem;
+	margin: 0;
+}
+
 .echo-card.uploading {
 	cursor: default;
 	border-color: var(--text-muted);
