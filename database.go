@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/coalaura/schgo"
 	_ "modernc.org/sqlite"
 )
 
@@ -35,38 +36,36 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	db.SetMaxIdleConns(16)
 	db.SetConnMaxLifetime(time.Hour)
 
-	b := NewTableBuilder(db, "echos")
-
-	err = b.Create()
+	schema, err := schgo.NewSchema(db)
 	if err != nil {
+		db.Close()
+
 		return nil, err
 	}
 
-	err = b.AddColumns([]SQLiteColumn{
-		{"hash", "TEXT NOT NULL"},
-		{"name", "TEXT NOT NULL"},
-		{"extension", "TEXT NOT NULL"},
-		{"size", "INTEGER NOT NULL DEFAULT 0"},
-		{"upload_size", "INTEGER NOT NULL DEFAULT 0"},
-		{"timestamp", "INTEGER NOT NULL DEFAULT 0"},
+	table := schema.Table("echos")
 
-		{"categories", "TEXT NULL"},
-		{"tags", "TEXT NULL"},
-		{"caption", "TEXT NULL"},
-		{"text", "TEXT NULL"},
-		{"safety", "TEXT NULL"},
-	})
-	if err != nil {
-		return nil, err
-	}
+	table.Primary("id", "INTEGER")
 
-	_, err = db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_echos_hash ON echos(hash)")
-	if err != nil {
-		return nil, err
-	}
+	table.Column("hash", "TEXT").NotNull().Unique()
+	table.Column("name", "TEXT").NotNull()
+	table.Column("extension", "TEXT").NotNull()
+	table.Column("size", "INTEGER").NotNull().Default("0")
+	table.Column("upload_size", "INTEGER").NotNull().Default("0")
+	table.Column("timestamp", "INTEGER").NotNull().Default("0")
 
-	_, err = db.Exec("CREATE INDEX IF NOT EXISTS idx_echos_timestamp ON echos(timestamp)")
+	table.Column("categories", "TEXT").Null()
+	table.Column("tags", "TEXT").Null()
+	table.Column("caption", "TEXT").Null()
+	table.Column("text", "TEXT").Null()
+	table.Column("safety", "TEXT").Null()
+
+	table.Index("idx_echos_timestamp", "timestamp")
+
+	err = schema.Apply()
 	if err != nil {
+		db.Close()
+
 		return nil, err
 	}
 

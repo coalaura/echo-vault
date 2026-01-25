@@ -4,6 +4,7 @@ go 1.25.6
 
 require (
 	github.com/coalaura/plain v1.1.8
+	github.com/coalaura/schgo v0.1.0
 	github.com/gen2brain/webp v0.5.5
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/goccy/go-yaml v1.19.2

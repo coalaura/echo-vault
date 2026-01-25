@@ -1,5 +1,7 @@
 github.com/coalaura/plain v1.1.8 h1:igkH8ZSVDcIVWpZCvQ4I7zjWL1w6sxOeyT9NwP7Njzs=
 github.com/coalaura/plain v1.1.8/go.mod h1:jcMR/C9RDdl8EQOHD4d/u8DoO1AI00fLDJfdfmrCFNA=
+github.com/coalaura/schgo v0.1.0 h1:csmjDsI8gi1l60iydwxids4zGWXRhW5PzFYKfaD4ArQ=
+github.com/coalaura/schgo v0.1.0/go.mod h1:ircnflc4NNJhXBFO197QEBE3iYBd9CovG263HhZkihI=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
