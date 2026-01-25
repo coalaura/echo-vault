@@ -67,7 +67,7 @@ func main() {
 	usage.Add(size)
 	count.Add(total)
 
-	go RunBackfill(total)
+	go database.Backfill(total)
 
 	handleTasks()
 

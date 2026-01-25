@@ -390,5 +390,63 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 		}
 	}
 
+	err = d.Optimize(20)
+	if err != nil {
+		log.Warnf("Verify optimization failed: %v\n", err)
+	}
+
 	return totalSize, uint64(total), nil
+}
+
+func (d *EchoDatabase) Optimize(thresholdMB int64) error {
+	var (
+		pageCount     int64
+		freelistCount int64
+		pageSize      int64
+	)
+
+	err := d.QueryRow("PRAGMA page_count").Scan(&pageCount)
+	if err != nil {
+		return err
+	}
+
+	err = d.QueryRow("PRAGMA freelist_count").Scan(&freelistCount)
+	if err != nil {
+		return err
+	}
+
+	err = d.QueryRow("PRAGMA page_size").Scan(&pageSize)
+	if err != nil {
+		return err
+	}
+
+	if freelistCount == 0 {
+		return nil
+	}
+
+	wastedBytes := freelistCount * pageSize
+	wastedMB := wastedBytes / 1024 / 1024
+
+	if wastedMB < thresholdMB {
+		return nil
+	}
+
+	totalBytes := pageCount * pageSize
+	fragPercent := (float64(wastedBytes) / float64(totalBytes)) * 100
+
+	log.Printf("Database fragmentation: %.2f%% (%d MB wasted). Optimization started...\n", fragPercent, wastedMB)
+
+	_, err = d.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+	if err != nil {
+		return err
+	}
+
+	_, err = d.Exec("VACUUM")
+	if err != nil {
+		return err
+	}
+
+	log.Println("Database optimization complete.")
+
+	return nil
 }
