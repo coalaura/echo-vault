@@ -119,7 +119,7 @@ func NewDefaultConfig() EchoConfig {
 		AI: EchoConfigAI{
 			OpenRouterToken: "",
 			TaggingModel:    "google/gemma-3-27b-it",
-			EmbeddingModel:  "openai/text-embedding-3-small",
+			EmbeddingModel:  "openai/text-embedding-3-large",
 			MinSimilarity:   25,
 			ReTagEmpty:      false,
 		},

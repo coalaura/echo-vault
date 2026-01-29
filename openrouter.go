@@ -19,6 +19,7 @@ import (
 
 type EchoMeta struct {
 	Description string `json:"description"`
+	Phrases     string `json:"phrases"`
 	Safety      string `json:"safety"`
 }
 
@@ -31,22 +32,19 @@ var (
 		Properties: map[string]jsonschema.Definition{
 			"description": {
 				Type:        jsonschema.String,
-				Description: "Concise visual description for semantic search (50-150 words)",
+				Description: "Natural visual description (50-100 words)",
+			},
+			"phrases": {
+				Type:        jsonschema.String,
+				Description: "Comma-separated casual search phrases (3-5 phrases, 2-4 words each)",
 			},
 			"safety": {
 				Type:        jsonschema.String,
 				Description: "Content safety classification",
-				Enum: []string{
-					"ok",
-					"suggestive",
-					"explicit",
-					"violence",
-					"selfharm",
-					"sensitive",
-				},
+				Enum:        []string{"ok", "suggestive", "explicit", "violence", "selfharm", "sensitive"},
 			},
 		},
-		Required:             []string{"description", "safety"},
+		Required:             []string{"description", "phrases", "safety"},
 		AdditionalProperties: false,
 	}
 )
@@ -225,8 +223,12 @@ func (t *EchoMeta) Clean() error {
 	return nil
 }
 
-func (t *EchoMeta) Serialize() (string, string) {
-	return t.Description, t.Safety
+func (t *EchoMeta) Serialize() (string, string, string) {
+	return t.Description, t.Phrases, t.Safety
+}
+
+func (t *EchoMeta) Embedding() string {
+	return t.Phrases + "\n\n" + t.Description
 }
 
 func IsValidSafety(safety string) bool {

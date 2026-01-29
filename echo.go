@@ -20,6 +20,7 @@ type Echo struct {
 	Safety     string  `json:"safety,omitempty"`
 	Similarity float32 `json:"similarity,omitempty"`
 
+	Phrases     string `json:"-"`
 	Description string `json:"-"`
 }
 

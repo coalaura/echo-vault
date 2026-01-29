@@ -54,9 +54,9 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 		return nil, nil
 	}
 
-	enhancedQuery := ExpandQuery(query)
+	query = strings.TrimSpace(query)
 
-	results, err := s.collection.Query(ctx, enhancedQuery, amount, nil, nil)
+	results, err := s.collection.Query(ctx, query, amount, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (s *VectorStore) Query(ctx context.Context, query string, max int) ([]Vecto
 func (s *VectorStore) Store(hash string, entry EchoMeta) error {
 	document := chromem.Document{
 		ID:      hash,
-		Content: entry.Description,
+		Content: entry.Embedding(),
 	}
 
 	return s.collection.AddDocument(context.Background(), document)
@@ -97,16 +97,4 @@ func (s *VectorStore) Has(hash string) bool {
 
 func (s *VectorStore) Delete(hash string) error {
 	return s.collection.Delete(context.Background(), nil, nil, hash)
-}
-
-func ExpandQuery(query string) string {
-	query = strings.TrimSpace(query)
-
-	// For very short queries, add context
-	words := strings.Fields(query)
-	if len(words) <= 2 {
-		return "image showing " + query
-	}
-
-	return query
 }
