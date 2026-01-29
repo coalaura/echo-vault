@@ -83,6 +83,19 @@ func (d *EchoDatabase) Backfill(total uint64) {
 			queue.Work(func() error {
 				defer completed.Add(1)
 
+				if echo.Description != "" && echo.Safety != "" {
+					err := vector.Store(echo.Hash, EchoMeta{
+						Description: echo.Description,
+						Safety:      echo.Safety,
+					})
+
+					if err != nil {
+						log.Warnf("[%s] Failed to store vector: %v\n", echo.Hash, err)
+					}
+
+					return nil
+				}
+
 				cost := echo.GenerateTags(context.Background(), true, true)
 				if cost > 0 {
 					totalCostMx.Lock()
