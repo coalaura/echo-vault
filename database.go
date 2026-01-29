@@ -55,6 +55,7 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	table.Column("timestamp", "INTEGER").NotNull().Default("0")
 
 	table.Column("description", "TEXT").Null()
+	table.Column("phrases", "TEXT").Null()
 	table.Column("safety", "TEXT").Null()
 
 	table.Index("idx_echos_timestamp", "timestamp")
@@ -84,10 +85,11 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 	var (
 		e           Echo
 		description sql.NullString
+		phrases     sql.NullString
 		safety      sql.NullString
 	)
 
-	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &safety)
+	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, phrases, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -96,13 +98,14 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 	}
 
 	e.Description = description.String
+	e.Phrases = phrases.String
 	e.Safety = safety.String
 
 	return &e, nil
 }
 
 func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, phrases, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -114,15 +117,17 @@ func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, 
 		var (
 			e           Echo
 			description sql.NullString
+			phrases     sql.NullString
 			safety      sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
 		if err != nil {
 			return nil, err
 		}
 
 		e.Description = description.String
+		e.Phrases = phrases.String
 		e.Safety = safety.String
 
 		echos = append(echos, e)
@@ -146,7 +151,7 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 
 	var b strings.Builder
 
-	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, description, safety FROM echos WHERE hash IN (")
+	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
 	b.WriteString(placeholders)
 	b.WriteString(") ORDER BY CASE hash ")
 
@@ -179,17 +184,15 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 
 	for rows.Next() {
 		var (
-			e           Echo
-			description sql.NullString
-			safety      sql.NullString
+			e      Echo
+			safety sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
 		if err != nil {
 			return nil, err
 		}
 
-		e.Description = description.String
 		e.Safety = safety.String
 
 		echos = append(echos, e)
@@ -254,9 +257,9 @@ func (d *EchoDatabase) SetSafety(hash string, safety string) error {
 }
 
 func (d *EchoDatabase) SetTags(hash string, entry EchoMeta) error {
-	description, safety := entry.Serialize()
+	description, phrases, safety := entry.Serialize()
 
-	_, err := d.Exec("UPDATE echos SET description = ?, safety = ? WHERE hash = ?", description, safety, hash)
+	_, err := d.Exec("UPDATE echos SET description = ?, phrases = ?, safety = ? WHERE hash = ?", description, phrases, safety, hash)
 	if err != nil {
 		return err
 	}

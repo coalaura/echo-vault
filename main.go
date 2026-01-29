@@ -58,6 +58,10 @@ func main() {
 
 	defer database.Close()
 
+	if handleTasks() {
+		return
+	}
+
 	size, total, err := database.Verify()
 	log.MustFail(err)
 
@@ -68,8 +72,6 @@ func main() {
 	count.Add(total)
 
 	go database.Backfill(total)
-
-	handleTasks()
 
 	log.Println("Preparing router...")
 

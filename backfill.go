@@ -83,7 +83,7 @@ func (d *EchoDatabase) Backfill(total uint64) {
 			queue.Work(func() error {
 				defer completed.Add(1)
 
-				if echo.Description != "" && echo.Safety != "" {
+				if echo.Phrases != "" && echo.Description != "" && echo.Safety != "" {
 					err := vector.Store(echo.Hash, EchoMeta{
 						Description: echo.Description,
 						Safety:      echo.Safety,
