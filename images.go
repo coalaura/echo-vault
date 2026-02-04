@@ -6,7 +6,7 @@ import (
 	"image/png"
 	"io"
 
-	"github.com/gen2brain/webp"
+	"github.com/coalaura/webp"
 )
 
 func decodeImage(rd io.Reader) (image.Image, error) {
@@ -72,7 +72,7 @@ func saveImageAsJPEG(rd io.Reader, path string) (int64, error) {
 	return wr.N, err
 }
 
-func getWebPOptions() webp.Options {
+func getWebPOptions() *webp.Options {
 	var opts webp.Options
 
 	switch config.Images.Effort {
@@ -87,10 +87,10 @@ func getWebPOptions() webp.Options {
 	if config.Images.Quality == 100 {
 		opts.Lossless = true
 	} else {
-		opts.Quality = int(config.Images.Quality)
+		opts.Quality = float32(config.Images.Quality)
 	}
 
-	return opts
+	return &opts
 }
 
 func getPNGEncoder() *png.Encoder {
