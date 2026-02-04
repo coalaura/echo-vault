@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/coalaura/plain v1.1.9
 	github.com/coalaura/schgo v0.1.1
-	github.com/gen2brain/webp v0.5.5
+	github.com/coalaura/webp v1.6.0
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/goccy/go-yaml v1.19.2
 	github.com/mozillazg/go-unidecode v0.2.0
@@ -15,12 +15,10 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/tetratelabs/wazero v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	modernc.org/libc v1.67.6 // indirect
