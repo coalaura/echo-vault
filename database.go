@@ -50,6 +50,7 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	table.Column("hash", "TEXT").NotNull().Unique()
 	table.Column("name", "TEXT").NotNull()
 	table.Column("extension", "TEXT").NotNull()
+	table.Column("animated", "INTEGER").NotNull().Default("0")
 	table.Column("size", "INTEGER").NotNull().Default("0")
 	table.Column("upload_size", "INTEGER").NotNull().Default("0")
 	table.Column("timestamp", "INTEGER").NotNull().Default("0")
@@ -89,7 +90,7 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 		safety      sql.NullString
 	)
 
-	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, phrases, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
+	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, description, phrases, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -105,7 +106,7 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 }
 
 func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, size, upload_size, timestamp, description, phrases, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, description, phrases, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, 
 			safety      sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +152,7 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 
 	var b strings.Builder
 
-	b.WriteString("SELECT id, hash, name, extension, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
+	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
 	b.WriteString(placeholders)
 	b.WriteString(") ORDER BY CASE hash ")
 
@@ -188,7 +189,7 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 			safety sql.NullString
 		)
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +213,7 @@ func (d *EchoDatabase) Create(ctx context.Context, echo *Echo) error {
 		return err
 	}
 
-	_, err = d.Exec("INSERT INTO echos (hash, name, extension, size, upload_size, timestamp) VALUES (?, ?, ?, ?, ?, ?)", echo.Hash, echo.Name, echo.Extension, echo.Size, echo.UploadSize, echo.Timestamp)
+	_, err = d.Exec("INSERT INTO echos (hash, name, extension, animated, size, upload_size, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)", echo.Hash, echo.Name, echo.Extension, echo.Animated, echo.Size, echo.UploadSize, echo.Timestamp)
 	if err != nil {
 		return err
 	}
