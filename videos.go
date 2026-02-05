@@ -25,6 +25,10 @@ func saveVideoAsMKV(ctx context.Context, input, path string) (int64, error) {
 	return runFFMpeg(ctx, input, path, getMKVArgs())
 }
 
+func saveVideoAsWebP(ctx context.Context, input, path string) (int64, error) {
+	return runFFMpeg(ctx, input, path, getWebPArgs())
+}
+
 func getMP4Args() []string {
 	// Base settings: single video/audio stream, strip metadata/subs, yuv420p for device compatibility,
 	// faststart relocates moov atom so browsers can begin playback before full download
@@ -209,5 +213,39 @@ func getMKVArgs() []string {
 		"-c:a", "aac",
 		"-b:a", "160k",
 		"-ar", "48000",
+	)
+}
+
+func getWebPArgs() []string {
+	common := []string{
+		"-map", "0:v:0",
+		"-an", // No audio for WebP
+		"-sn", "-dn",
+		"-map_metadata", "-1",
+		"-map_chapters", "-1",
+		"-pix_fmt", "yuv420p",
+		"-f", "webp",
+	}
+
+	if config.Videos.Optimize {
+		return append(common,
+			"-c:v", "libwebp",
+			"-lossless", "0",
+			"-compression_level", "6", // Max compression
+			"-q:v", "75",
+			"-preset", "default",
+			"-loop", "0", // Infinite loop
+			"-vsync", "vfr",
+		)
+	}
+
+	return append(common,
+		"-c:v", "libwebp",
+		"-lossless", "0",
+		"-compression_level", "4", // Default compression
+		"-q:v", "85",
+		"-preset", "default",
+		"-loop", "0",
+		"-vsync", "vfr",
 	)
 }
