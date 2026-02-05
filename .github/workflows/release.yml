@@ -14,13 +14,29 @@ jobs:
 
     strategy:
       matrix:
-        goos:   [windows, linux]
-        goarch: [amd64, arm64]
+        include:
+          - goos: linux
+            goarch: amd64
+            zig_target: x86_64-linux-musl
+          - goos: linux
+            goarch: arm64
+            zig_target: aarch64-linux-musl
+          - goos: windows
+            goarch: amd64
+            zig_target: x86_64-windows-gnu
+          - goos: windows
+            goarch: arm64
+            zig_target: aarch64-windows-gnu
       fail-fast: false
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+
+    - name: Set up Zig
+      uses: goto-bus-stop/setup-zig@v2
+      with:
+        version: 0.15.2
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -52,19 +68,28 @@ jobs:
 
     - name: Build ${{ matrix.goos }}_${{ matrix.goarch }}
       shell: bash
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 1
+        CC: zig cc -target ${{ matrix.zig_target }}
+        CXX: zig c++ -target ${{ matrix.zig_target }}
       run: |
         mkdir -p build
-        [[ "${{ matrix.goos }}" == "windows" ]] && EXT=".exe" || EXT=""
+        [[ "$GOOS" == "windows" ]] && EXT=".exe" || EXT=""
 
         OUT="build/echo_vault_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
 
-        GOOS=${{ matrix.goos }} \
-        GOARCH=${{ matrix.goarch }} \
-        CGO_ENABLED=0 \
+        if [[ "${{ matrix.zig_target }}" == *"musl"* ]]; then
+          LDFLAGS="-linkmode external -extldflags '-static'"
+        else
+          LDFLAGS=""
+        fi
+
         go build \
           -trimpath \
           -buildvcs=false \
-          -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}'" \
+          -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}' $LDFLAGS" \
           -o "$OUT" .
 
     - name: Upload artifact
