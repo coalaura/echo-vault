@@ -177,14 +177,39 @@
 		return btn;
 	}
 
+	async function createFrozenCanvas(url, width, height) {
+		const img = new Image();
+
+		img.crossOrigin = "anonymous";
+		img.src = url;
+
+		await new Promise((resolve, reject) => {
+			img.onload = resolve;
+			img.onerror = reject;
+		});
+
+		const canvas = document.createElement("canvas");
+
+		canvas.width = width || img.naturalWidth;
+		canvas.height = height || img.naturalHeight;
+
+		const ctx = canvas.getContext("2d");
+
+		ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+		return canvas;
+	}
+
 	function createEchoNode(item) {
-		const isVideo = VideoExtensions.includes(item.extension);
+		const isVideo = VideoExtensions.includes(item.extension),
+			isAnim = item.animated;
 
 		const card = document.createElement("div");
 
 		card.id = `echo-${item.hash}`;
 		card.className = `echo-card`;
 		card.dataset.hash = item.hash;
+		card.dataset.animated = isAnim ? "true" : "false";
 
 		card.classList.toggle("bg-processing", State.processing.has(item.hash));
 
@@ -201,7 +226,7 @@
 
 		link.appendChild(loader);
 
-		let media;
+		let media, frozenCanvas;
 
 		const onLoad = () => {
 			loader.remove();
@@ -248,6 +273,60 @@
 
 				media.currentTime = 0;
 			});
+		} else if (isAnim) {
+			media = document.createElement("img");
+
+			media.className = "echo-media animated-source";
+			media.src = item.url;
+			media.style.display = "none";
+
+			const placeholder = document.createElement("div");
+
+			placeholder.className = "echo-media frozen-preview";
+
+			link.appendChild(placeholder);
+
+			createFrozenCanvas(item.url, item.width, item.height)
+				.then(canvas => {
+					frozenCanvas = canvas;
+
+					canvas.className = "echo-media frozen-preview loaded";
+
+					placeholder.replaceWith(canvas);
+				})
+				.catch(() => {
+					placeholder.style.display = "none";
+
+					media.style.display = "block";
+
+					media.classList.add("loaded");
+				});
+
+			media.addEventListener("load", onLoad);
+			media.addEventListener("error", onError);
+
+			card.addEventListener("mouseenter", () => {
+				if (frozenCanvas) {
+					frozenCanvas.style.display = "none";
+				}
+
+				media.style.display = "block";
+			});
+
+			card.addEventListener("mouseleave", () => {
+				media.style.display = "none";
+
+				if (frozenCanvas) {
+					frozenCanvas.style.display = "block";
+				}
+			});
+
+			const badge = document.createElement("div");
+
+			badge.className = "type-badge";
+			badge.textContent = "ANIM";
+
+			card.appendChild(badge);
 		} else {
 			media = document.createElement("img");
 
@@ -951,7 +1030,8 @@
 		}
 
 		switch (type) {
-			case 0: { // Create
+			case 0: {
+				// Create
 				if (State.controllers.query || State.query) {
 					return;
 				}
@@ -976,19 +1056,22 @@
 
 				break;
 			}
-			case 1: { // Update
+			case 1: {
+				// Update
 				if (State.cache.has(targetHash) && echo) {
 					renderBatch(echo, "update");
 				}
 
 				break;
 			}
-			case 2: { // Delete
+			case 2: {
+				// Delete
 				removeLocalEcho(targetHash);
 
 				break;
 			}
-			case 3: { // Processing
+			case 3: {
+				// Processing
 				const node = document.getElementById(`echo-${hash}`);
 
 				if (processing) {
