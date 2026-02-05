@@ -45,13 +45,14 @@ type EchoConfigVideos struct {
 }
 
 type EchoConfigGIFs struct {
-	Enabled      bool `yaml:"enabled"`
-	Optimize     bool `yaml:"optimize"`
-	Effort       int  `yaml:"effort"`
-	Quality      int  `yaml:"quality"`
-	MaxColors    int  `yaml:"max_colors"`
-	MaxFramerate int  `yaml:"max_framerate"`
-	MaxWidth     int  `yaml:"max_width"`
+	Enabled      bool   `yaml:"enabled"`
+	Format       string `yaml:"format"`
+	Optimize     bool   `yaml:"optimize"`
+	Effort       int    `yaml:"effort"`
+	Quality      int    `yaml:"quality"`
+	MaxColors    int    `yaml:"max_colors"`
+	MaxFramerate int    `yaml:"max_framerate"`
+	MaxWidth     int    `yaml:"max_width"`
 }
 
 type EchoConfigAI struct {
@@ -109,6 +110,7 @@ func NewDefaultConfig() EchoConfig {
 		},
 		GIFs: EchoConfigGIFs{
 			Enabled:      false,
+			Format:       "webp",
 			Optimize:     true,
 			Effort:       2,
 			Quality:      90,
@@ -214,6 +216,10 @@ func (c *EchoConfig) Validate() error {
 	}
 
 	// gifs
+	if c.GIFs.Format != "gif" && c.GIFs.Format != "webp" {
+		return fmt.Errorf("gifs.format must be one of (gif, webp), got %q", c.GIFs.Format)
+	}
+
 	if c.GIFs.Effort < 1 || c.GIFs.Effort > 3 {
 		return fmt.Errorf("gifs.effort must be 1-3, got %d", c.GIFs.Effort)
 	}
@@ -253,7 +259,7 @@ func (c *EchoConfig) Validate() error {
 	if c.Videos.Enabled || c.GIFs.Enabled {
 		ffmpeg, err := exec.LookPath("ffmpeg")
 		if err != nil {
-			return errors.New("ffmpeg is required for video/gif/awebp input")
+			return errors.New("ffmpeg is required for video/gif/a-webp input")
 		}
 
 		c.ffmpeg = ffmpeg
@@ -261,7 +267,7 @@ func (c *EchoConfig) Validate() error {
 		if c.Videos.Format == "gif" || c.Videos.Format == "webp" || c.GIFs.Enabled {
 			ffprobe, err := exec.LookPath("ffprobe")
 			if err != nil {
-				return errors.New("ffprobe is required for gif/awebp input/output")
+				return errors.New("ffprobe is required for gif/a-webp input/output")
 			}
 
 			c.ffprobe = ffprobe
@@ -318,6 +324,7 @@ func (e *EchoConfig) Store() error {
 		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (compresses and re-encodes; default: %v)", def.Videos.Optimize))},
 
 		"$.gifs.enabled":       {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
+		"$.gifs.format":        {yaml.HeadComment(fmt.Sprintf(" target format for gifs (gif or webp; default: %v)", def.GIFs.Format))},
 		"$.gifs.optimize":      {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: %v)", def.GIFs.Optimize))},
 		"$.gifs.effort":        {yaml.HeadComment(fmt.Sprintf(" gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.GIFs.Effort))},
 		"$.gifs.quality":       {yaml.HeadComment(fmt.Sprintf(" visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: %v)", def.GIFs.Quality))},
