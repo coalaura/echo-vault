@@ -68,6 +68,34 @@ func saveVideoAsGIF(ctx context.Context, input, path string) (int64, error) {
 	return size, nil
 }
 
+func saveWebPAsGIF(ctx context.Context, input, path string) (int64, error) {
+	fps, err := probeFPS(ctx, input)
+	if err != nil {
+		log.Warnf("failed to probe fps: %v\n", err)
+	}
+
+	args := []string{
+		"-map", "0:v:0",
+		"-an", "-sn",
+		"-filter_complex", buildGifFilter(fps > 0 && fps > float64(config.GIFs.MaxFramerate)),
+		"-f", "gif",
+	}
+
+	size, err := runFFMpeg(ctx, input, path, args)
+	if err != nil {
+		return 0, err
+	}
+
+	if config.GIFs.Optimize {
+		size, err = optimizeGIF(ctx, path)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return size, nil
+}
+
 func optimizeGIF(ctx context.Context, path string) (int64, error) {
 	args := gifsicleArgs(path)
 

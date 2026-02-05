@@ -108,6 +108,17 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 
 	switch e.Extension {
 	case "jpg", "jpeg", "png", "webp":
+		if e.Extension == "webp" {
+			isAnimated, err := detectAnimatedWebP(path)
+			if err != nil {
+				return 0, err
+			}
+
+			if isAnimated {
+				return e.saveAnimatedWebP(ctx, path)
+			}
+		}
+
 		file, err := OpenFileForReading(path)
 		if err != nil {
 			return 0, err
@@ -126,6 +137,12 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 			return saveImageAsJPEG(file, e.Storage())
 		}
 	case "gif":
+		e.Extension = config.Images.Format
+
+		if e.Extension == "webp" {
+			return saveGIFAsAnimatedWebP(path, e.Storage())
+		}
+
 		e.Extension = "gif"
 
 		return saveGIFAsGIF(ctx, path, e.Storage())
@@ -145,10 +162,23 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 			return saveVideoAsMKV(ctx, path, e.Storage())
 		case "gif":
 			return saveVideoAsGIF(ctx, path, e.Storage())
+		case "webp":
+			return saveVideoAsWebP(ctx, path, e.Storage())
 		}
 	}
 
 	return 0, fmt.Errorf("unsupported extension %q", e.Extension)
+}
+
+func (e *Echo) saveAnimatedWebP(_ context.Context, path string) (int64, error) {
+	switch config.Images.Format {
+	case "webp":
+		return saveAnimatedWebPAsWebP(path, e.Storage())
+	case "png", "jpeg":
+		return extractAnimatedWebPFirstFrame(path, e.Storage(), config.Images.Format)
+	}
+
+	return 0, fmt.Errorf("unsupported target format for animated webp: %s", config.Images.Format)
 }
 
 func (e *Echo) IsImage() bool {

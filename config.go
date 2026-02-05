@@ -253,15 +253,15 @@ func (c *EchoConfig) Validate() error {
 	if c.Videos.Enabled || c.GIFs.Enabled {
 		ffmpeg, err := exec.LookPath("ffmpeg")
 		if err != nil {
-			return errors.New("ffmpeg is required for video/gif input")
+			return errors.New("ffmpeg is required for video/gif/awebp input")
 		}
 
 		c.ffmpeg = ffmpeg
 
-		if c.Videos.Format == "gif" || c.GIFs.Enabled {
+		if c.Videos.Format == "gif" || c.Videos.Format == "webp" || c.GIFs.Enabled {
 			ffprobe, err := exec.LookPath("ffprobe")
 			if err != nil {
-				return errors.New("ffprobe is required for gif input/output")
+				return errors.New("ffprobe is required for gif/awebp input/output")
 			}
 
 			c.ffprobe = ffprobe
@@ -314,7 +314,7 @@ func (e *EchoConfig) Store() error {
 		"$.images.quality": {yaml.HeadComment(fmt.Sprintf(" webp quality (0-100, 100 = lossless; default: %v)", def.Images.Quality))},
 
 		"$.videos.enabled":  {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg/ffprobe; default: %v)", def.Videos.Enabled))},
-		"$.videos.format":   {yaml.HeadComment(fmt.Sprintf(" target format for videos (mp4, webm, mov, m4v, mkv or gif; default: %v)", def.Videos.Format))},
+		"$.videos.format":   {yaml.HeadComment(fmt.Sprintf(" target format for videos (mp4, webm, mov, m4v, mkv, gif or webp; default: %v)", def.Videos.Format))},
 		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (compresses and re-encodes; default: %v)", def.Videos.Optimize))},
 
 		"$.gifs.enabled":       {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
@@ -352,7 +352,8 @@ func (e *EchoConfig) IsValidImageFormat(format string) bool {
 }
 
 func (e *EchoConfig) IsValidVideoFormat(format string, checkEnabled bool) bool {
-	if format == "gif" {
+	if format == "gif" || format == "webp" {
+		// Both GIF and animated WebP require GIF processing pipeline
 		return !checkEnabled || e.GIFs.Enabled
 	}
 
