@@ -50,7 +50,7 @@ var (
 )
 
 func (e *Echo) GenerateTags(ctx context.Context, noLogs, noSync bool) float64 {
-	if config.AI.OpenRouterToken == "" || !e.IsImage() {
+	if config.AI.OpenRouterToken == "" || !e.IsImage() || e.Animated {
 		return 0
 	}
 

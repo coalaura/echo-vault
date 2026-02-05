@@ -13,6 +13,7 @@ type Echo struct {
 	Hash       string `json:"hash"`
 	Name       string `json:"name"`
 	Extension  string `json:"extension"`
+	Animated   bool   `json:"animated"`
 	Size       int64  `json:"size"`
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
@@ -137,13 +138,12 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 			return saveImageAsJPEG(file, e.Storage())
 		}
 	case "gif":
+		e.Animated = true
 		e.Extension = config.GIFs.Format
 
 		if e.Extension == "webp" {
 			return saveGIFAsAnimatedWebP(path, e.Storage())
 		}
-
-		e.Extension = "gif"
 
 		return saveGIFAsGIF(ctx, path, e.Storage())
 	case "mp4", "webm", "mov", "m4v", "mkv":
@@ -161,8 +161,12 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 		case "mkv":
 			return saveVideoAsMKV(ctx, path, e.Storage())
 		case "gif":
+			e.Animated = true
+
 			return saveVideoAsGIF(ctx, path, e.Storage())
 		case "webp":
+			e.Animated = true
+
 			return saveVideoAsWebP(ctx, path, e.Storage())
 		}
 	}
@@ -173,6 +177,8 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 func (e *Echo) saveAnimatedWebP(_ context.Context, path string) (int64, error) {
 	switch config.Images.Format {
 	case "webp":
+		e.Animated = true
+
 		return saveAnimatedWebPAsWebP(path, e.Storage())
 	case "png", "jpeg":
 		return extractAnimatedWebPFirstFrame(path, e.Storage(), config.Images.Format)
