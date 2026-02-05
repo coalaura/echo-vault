@@ -137,7 +137,7 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 			return saveImageAsJPEG(file, e.Storage())
 		}
 	case "gif":
-		e.Extension = config.Images.Format
+		e.Extension = config.GIFs.Format
 
 		if e.Extension == "webp" {
 			return saveGIFAsAnimatedWebP(path, e.Storage())
