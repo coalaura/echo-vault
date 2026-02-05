@@ -90,6 +90,8 @@ func getWebPOptions() *webp.Options {
 		opts.Quality = float32(config.Images.Quality)
 	}
 
+	opts.AutoFilter = true
+
 	return &opts
 }
 
