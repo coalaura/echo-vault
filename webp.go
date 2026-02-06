@@ -35,7 +35,7 @@ func saveAnimatedWebPAsWebP(input, path string) (int64, error) {
 		return 0, err
 	}
 
-	anim, err := webp.DecodeAll(bytes.NewReader(data))
+	anim, err := webp.DecodeAll(bytes.NewReader(data), getWebPDecodeOptions())
 	if err != nil {
 		return 0, err
 	}
@@ -97,7 +97,7 @@ func extractAnimatedWebPFirstFrame(input, path, format string) (int64, error) {
 		return 0, err
 	}
 
-	anim, err := webp.DecodeAll(bytes.NewReader(data))
+	anim, err := webp.DecodeAll(bytes.NewReader(data), getWebPDecodeOptions())
 	if err != nil {
 		return 0, err
 	}
@@ -126,4 +126,10 @@ func extractAnimatedWebPFirstFrame(input, path, format string) (int64, error) {
 	}
 
 	return wr.N, err
+}
+
+func getWebPDecodeOptions() *webp.DecodeOptions {
+	return &webp.DecodeOptions{
+		UseThreads: true,
+	}
 }
