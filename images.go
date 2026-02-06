@@ -91,6 +91,7 @@ func getWebPOptions() *webp.Options {
 	}
 
 	opts.AutoFilter = true
+	opts.UseThreads = true
 
 	return &opts
 }
