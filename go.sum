@@ -8,6 +8,8 @@ github.com/coalaura/webp v1.6.3-0.20260206192429-5e329774d659 h1:ENxuVZeNll5fgFt
 github.com/coalaura/webp v1.6.3-0.20260206192429-5e329774d659/go.mod h1:wBAV6t/ugy+Z0n2nStN8clIQghlnvJBtE0O2fLcZLo4=
 github.com/coalaura/webp v1.6.3 h1:yfX93vEBGVLE+MMaZW3q4bbu4nDYoKoyAu3z1fV6keg=
 github.com/coalaura/webp v1.6.3/go.mod h1:wBAV6t/ugy+Z0n2nStN8clIQghlnvJBtE0O2fLcZLo4=
+github.com/coalaura/webp v1.6.4 h1:ZEW+noklGVeVRVEGQdRkjqRu2mCYEoylWVuJkxkRBnE=
+github.com/coalaura/webp v1.6.4/go.mod h1:wBAV6t/ugy+Z0n2nStN8clIQghlnvJBtE0O2fLcZLo4=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
