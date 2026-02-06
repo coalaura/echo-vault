@@ -5,7 +5,7 @@ go 1.25.6
 require (
 	github.com/coalaura/plain v1.1.9
 	github.com/coalaura/schgo v0.1.1
-	github.com/coalaura/webp v1.6.3
+	github.com/coalaura/webp v1.6.4
 	github.com/go-chi/chi/v5 v5.2.4
 	github.com/goccy/go-yaml v1.19.2
 	github.com/mozillazg/go-unidecode v0.2.0
