@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
 	"image/jpeg"
 	"os"
@@ -63,27 +64,82 @@ func saveGIFAsAnimatedWebP(input, path string) (int64, error) {
 		return 0, err
 	}
 
-	anim := &webp.Animation{
-		Image:     make([]image.Image, len(gifImg.Image)),
-		Delay:     make([]int, len(gifImg.Delay)),
-		LoopCount: gifImg.LoopCount,
-		Background: color.RGBA{
-			R: gifImg.Config.ColorModel.(color.Palette)[0].(color.RGBA).R,
-			G: gifImg.Config.ColorModel.(color.Palette)[0].(color.RGBA).G,
-			B: gifImg.Config.ColorModel.(color.Palette)[0].(color.RGBA).B,
-			A: 255,
-		},
+	if len(gifImg.Image) == 0 {
+		return 0, errNoFrames
 	}
 
-	for i, img := range gifImg.Image {
-		anim.Image[i] = img
-		anim.Delay[i] = gifImg.Delay[i] * 10 // 1/100s to ms
+	background := color.RGBA{0, 0, 0, 0}
+
+	if gifImg.Config.ColorModel != nil {
+		if p, ok := gifImg.Config.ColorModel.(color.Palette); ok && int(gifImg.BackgroundIndex) < len(p) {
+			background = color.RGBAModel.Convert(p[gifImg.BackgroundIndex]).(color.RGBA)
+		}
+	}
+
+	bounds := image.Rect(0, 0, gifImg.Config.Width, gifImg.Config.Height)
+	canvas := image.NewRGBA(bounds)
+
+	draw.Draw(canvas, bounds, &image.Uniform{background}, image.Point{}, draw.Src)
+
+	frames := make([]image.Image, len(gifImg.Image))
+
+	var prevCanvas *image.RGBA
+
+	for i, srcFrame := range gifImg.Image {
+		if i < len(gifImg.Disposal) && gifImg.Disposal[i] == 3 {
+			prevCanvas = image.NewRGBA(bounds)
+
+			draw.Draw(prevCanvas, bounds, canvas, bounds.Min, draw.Src)
+		}
+
+		draw.Draw(canvas, srcFrame.Bounds(), srcFrame, srcFrame.Bounds().Min, draw.Over)
+
+		frameCopy := image.NewRGBA(bounds)
+
+		draw.Draw(frameCopy, bounds, canvas, bounds.Min, draw.Src)
+
+		frames[i] = frameCopy
+
+		if i < len(gifImg.Image)-1 {
+			disposal := byte(0)
+
+			if i < len(gifImg.Disposal) {
+				disposal = gifImg.Disposal[i]
+			}
+
+			switch disposal {
+			case 0, 1: // No disposal specified or do not dispose - keep canvas as is
+				// Do nothing
+			case 2: // Restore to background color - clear frame area to background
+				draw.Draw(canvas, srcFrame.Bounds(), &image.Uniform{background}, image.Point{}, draw.Src)
+			case 3: // Restore to previous - restore canvas to state before this frame
+				if prevCanvas != nil {
+					draw.Draw(canvas, bounds, prevCanvas, bounds.Min, draw.Src)
+				}
+			}
+		}
+	}
+
+	anim := &webp.Animation{
+		Image:      frames,
+		Delay:      make([]int, len(gifImg.Delay)),
+		LoopCount:  gifImg.LoopCount,
+		Background: background,
+	}
+
+	for i, delay := range gifImg.Delay {
+		if delay < 0 {
+			delay = 0
+		}
+
+		anim.Delay[i] = delay * 10
 	}
 
 	wr, err := OpenCountWriter(path)
 	if err != nil {
 		return 0, err
 	}
+
 	defer wr.Close()
 
 	err = webp.EncodeAll(wr, anim, getWebPOptions())
