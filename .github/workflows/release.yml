@@ -15,18 +15,33 @@ jobs:
     strategy:
       matrix:
         include:
-          - goos: linux
-            goarch: amd64
-            zig_target: x86_64-linux-musl
-          - goos: linux
-            goarch: arm64
-            zig_target: aarch64-linux-musl
-          - goos: windows
+          - name: windows-amd64
+            goos: windows
             goarch: amd64
             zig_target: x86_64-windows-gnu
-          - goos: windows
-            goarch: arm64
-            zig_target: aarch64-windows-gnu
+            ai: false
+            ext: .exe
+
+          - name: windows-amd64-ai
+            goos: windows
+            goarch: amd64
+            zig_target: x86_64-windows-gnu
+            ai: true
+            ext: .exe
+
+          - name: linux-amd64
+            goos: linux
+            goarch: amd64
+            zig_target: x86_64-linux-musl
+            ai: false
+            ext: ""
+
+          - name: linux-amd64-ai
+            goos: linux
+            goarch: amd64
+            zig_target: x86_64-linux-gnu
+            ai: true
+            ext: ""
       fail-fast: false
 
     steps:
@@ -78,15 +93,23 @@ jobs:
         mkdir -p build
         [[ "$GOOS" == "windows" ]] && EXT=".exe" || EXT=""
 
-        OUT="build/echo_vault_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}${EXT}"
+        OUT="build/${{ matrix.name }}${EXT}"
 
-        if [[ "${{ matrix.zig_target }}" == *"musl"* ]]; then
+        if [[ "${{ matrix.ai }}" == "true" ]]; then
+          TAGS="-tags ai"
+        else
+          TAGS=""
+        fi
+
+        # Only static link for linux-musl non-ai
+        if [[ "${{ matrix.zig_target }}" == *"musl"* && "${{ matrix.ai }}" != "true" ]]; then
           LDFLAGS="-linkmode external -extldflags '-static'"
         else
           LDFLAGS=""
         fi
 
         go build \
+          $TAGS \
           -trimpath \
           -buildvcs=false \
           -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}' $LDFLAGS" \
