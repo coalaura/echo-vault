@@ -261,8 +261,8 @@ func WriteBackup(wr *tar.Writer) error {
 		return err
 	}
 
-	if config.AI.OpenRouterToken != "" {
-		err = writeDirectoryToBackup(wr, TagsDirectory)
+	if vector != nil {
+		err = writeDirectoryToBackup(wr, ClipDirectory)
 		if err != nil {
 			return err
 		}

@@ -20,11 +20,6 @@ type EchoConfigServer struct {
 	DeleteOrphans  bool   `yaml:"delete_orphans"`
 }
 
-type EchoConfigUI struct {
-	NoSafetyBlur bool     `yaml:"no_safety_blur"`
-	IgnoreSafety []string `yaml:"ignore_safety"`
-}
-
 type EchoConfigBackup struct {
 	Enabled     bool `yaml:"enabled"`
 	Interval    int  `yaml:"interval"`
@@ -55,26 +50,16 @@ type EchoConfigGIFs struct {
 	MaxWidth     int    `yaml:"max_width"`
 }
 
-type EchoConfigAI struct {
-	OpenRouterToken string `yaml:"openrouter_token"`
-	TaggingModel    string `yaml:"tagging_model"`
-	EmbeddingModel  string `yaml:"embedding_model"`
-	MinSimilarity   int    `yaml:"min_similarity"`
-	ReTagEmpty      bool   `yaml:"re_tag_empty"`
-}
-
 type EchoConfig struct {
 	ffmpeg   string
 	ffprobe  string
 	gifsicle string
 
 	Server EchoConfigServer `yaml:"server"`
-	UI     EchoConfigUI     `yaml:"ui"`
 	Backup EchoConfigBackup `yaml:"backup"`
 	Images EchoConfigImages `yaml:"images"`
 	Videos EchoConfigVideos `yaml:"videos"`
 	GIFs   EchoConfigGIFs   `yaml:"gifs"`
-	AI     EchoConfigAI     `yaml:"ai"`
 }
 
 func NewDefaultConfig() EchoConfig {
@@ -87,10 +72,6 @@ func NewDefaultConfig() EchoConfig {
 			MaxFileSize:    20,
 			MaxConcurrency: 4,
 			DeleteOrphans:  false,
-		},
-		UI: EchoConfigUI{
-			NoSafetyBlur: false,
-			IgnoreSafety: []string{},
 		},
 		Backup: EchoConfigBackup{
 			Enabled:     true,
@@ -117,13 +98,6 @@ func NewDefaultConfig() EchoConfig {
 			MaxColors:    256,
 			MaxFramerate: 15,
 			MaxWidth:     480,
-		},
-		AI: EchoConfigAI{
-			OpenRouterToken: "",
-			TaggingModel:    "google/gemma-3-27b-it",
-			EmbeddingModel:  "openai/text-embedding-3-large",
-			MinSimilarity:   25,
-			ReTagEmpty:      false,
 		},
 	}
 }
@@ -175,15 +149,6 @@ func (c *EchoConfig) Validate() error {
 
 	if c.Server.MaxConcurrency < 1 {
 		return fmt.Errorf("server.max_concurrency must be >= 1, got %d", c.Server.MaxConcurrency)
-	}
-
-	// ui
-	if len(c.UI.IgnoreSafety) > 0 {
-		for i, tag := range c.UI.IgnoreSafety {
-			if !IsValidSafety(tag) {
-				return fmt.Errorf("ui.ignore_safety[%d] is not a valid safety tag: %q", i, tag)
-			}
-		}
 	}
 
 	// backup
@@ -240,21 +205,6 @@ func (c *EchoConfig) Validate() error {
 		return fmt.Errorf("gifs.max_width must be 1-1024, got %d", c.GIFs.MaxWidth)
 	}
 
-	// ai
-	if c.AI.OpenRouterToken != "" {
-		if c.AI.TaggingModel == "" {
-			return errors.New("ai.tagging_model must be set")
-		}
-
-		if c.AI.EmbeddingModel == "" {
-			return errors.New("ai.embedding_model must be set")
-		}
-
-		if c.AI.MinSimilarity < 0 || c.AI.MinSimilarity > 100 {
-			return fmt.Errorf("ai.min_similarity must be 0-100, got %d", c.AI.MinSimilarity)
-		}
-	}
-
 	// check ffmpeg dependency
 	if c.Videos.Enabled || c.GIFs.Enabled {
 		ffmpeg, err := exec.LookPath("ffmpeg")
@@ -307,9 +257,6 @@ func (e *EchoConfig) Store() error {
 		"$.server.max_concurrency": {yaml.HeadComment(fmt.Sprintf(" maximum concurrent uploads (default: %v)", def.Server.MaxConcurrency))},
 		"$.server.delete_orphans":  {yaml.HeadComment(fmt.Sprintf(" if echos without their file should be deleted (default: %v)", def.Server.DeleteOrphans))},
 
-		"$.ui.no_safety_blur": {yaml.HeadComment(fmt.Sprintf(" fully ignore safety tags in the UI (default: %v)", def.UI.NoSafetyBlur))},
-		"$.ui.ignore_safety":  {yaml.HeadComment(fmt.Sprintf(" list of safety tags to ignore in the UI (default: %v)", def.UI.IgnoreSafety))},
-
 		"$.backup.enabled":      {yaml.HeadComment(fmt.Sprintf(" if backups should be created (default: %v)", def.Backup.Enabled))},
 		"$.backup.interval":     {yaml.HeadComment(fmt.Sprintf(" how often backups should be created (in hours; default: %v)", def.Backup.Interval))},
 		"$.backup.keep_amount":  {yaml.HeadComment(fmt.Sprintf(" how many backups to keep before deleting the oldest (default: %v)", def.Backup.KeepAmount))},
@@ -331,12 +278,6 @@ func (e *EchoConfig) Store() error {
 		"$.gifs.max_colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.MaxColors))},
 		"$.gifs.max_framerate": {yaml.HeadComment(fmt.Sprintf(" maximum fps (1 - 30; default: %v)", def.GIFs.MaxFramerate))},
 		"$.gifs.max_width":     {yaml.HeadComment(fmt.Sprintf(" maximum width/height (1 - 1024; default: %v)", def.GIFs.MaxWidth))},
-
-		"$.ai.openrouter_token": {yaml.HeadComment(fmt.Sprintf(" openrouter token for image tagging (if empty, disables image tagging; default: %v)", def.AI.OpenRouterToken))},
-		"$.ai.tagging_model":    {yaml.HeadComment(fmt.Sprintf(" model used for image tagging (requires vision and structured output support; default: %v)", def.AI.TaggingModel))},
-		"$.ai.embedding_model":  {yaml.HeadComment(fmt.Sprintf(" model used for embedding (requires embedding support; default: %v)", def.AI.EmbeddingModel))},
-		"$.ai.min_similarity":   {yaml.HeadComment(fmt.Sprintf(" minimum similarity percentage (0-100) for results to be included (default: %v)", def.AI.MinSimilarity))},
-		"$.ai.re_tag_empty":     {yaml.HeadComment(fmt.Sprintf(" if echos without tags should be re-tagged (default: %v)", def.AI.ReTagEmpty))},
 	}
 
 	file, err := OpenFileForWriting("config.yml")

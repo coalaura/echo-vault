@@ -51,6 +51,10 @@ func main() {
 	vector, err = LoadVectorStore()
 	log.MustFail(err)
 
+	if vector != nil {
+		defer vector.Close()
+	}
+
 	log.Println("Connecting to database...")
 
 	database, err = ConnectToDatabase()
@@ -103,7 +107,6 @@ func main() {
 		gr.Get("/query/{page}", queryEchosHandler)
 
 		gr.Post("/upload", uploadHandler)
-		gr.Put("/echos/{hash}", updateEchoHandler)
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 

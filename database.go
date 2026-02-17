@@ -55,10 +55,6 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	table.Column("upload_size", "INTEGER").NotNull().Default("0")
 	table.Column("timestamp", "INTEGER").NotNull().Default("0")
 
-	table.Column("description", "TEXT").Null()
-	table.Column("phrases", "TEXT").Null()
-	table.Column("safety", "TEXT").Null()
-
 	table.Index("idx_echos_timestamp", "timestamp")
 
 	err = schema.Apply()
@@ -83,14 +79,9 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 }
 
 func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
-	var (
-		e           Echo
-		description sql.NullString
-		phrases     sql.NullString
-		safety      sql.NullString
-	)
+	var e Echo
 
-	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, description, phrases, safety FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
+	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -98,38 +89,26 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 		return nil, err
 	}
 
-	e.Description = description.String
-	e.Phrases = phrases.String
-	e.Safety = safety.String
-
 	return &e, nil
 }
 
 func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, description, phrases, safety FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	var echos []Echo
 
 	for rows.Next() {
-		var (
-			e           Echo
-			description sql.NullString
-			phrases     sql.NullString
-			safety      sql.NullString
-		)
+		var e Echo
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &description, &phrases, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
 		if err != nil {
 			return nil, err
 		}
-
-		e.Description = description.String
-		e.Phrases = phrases.String
-		e.Safety = safety.String
 
 		echos = append(echos, e)
 	}
@@ -152,7 +131,7 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 
 	var b strings.Builder
 
-	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp, safety FROM echos WHERE hash IN (")
+	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos WHERE hash IN (")
 	b.WriteString(placeholders)
 	b.WriteString(") ORDER BY CASE hash ")
 
@@ -184,17 +163,12 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 	var echos []Echo
 
 	for rows.Next() {
-		var (
-			e      Echo
-			safety sql.NullString
-		)
+		var e Echo
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &safety)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
 		if err != nil {
 			return nil, err
 		}
-
-		e.Safety = safety.String
 
 		echos = append(echos, e)
 	}
@@ -241,26 +215,6 @@ func (d *EchoDatabase) SetExtension(hash, extension string) error {
 
 func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	_, err := d.Exec("UPDATE echos SET size = ? WHERE hash = ?", size, hash)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *EchoDatabase) SetSafety(hash string, safety string) error {
-	_, err := d.Exec("UPDATE echos SET safety = ? WHERE hash = ?", safety, hash)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *EchoDatabase) SetTags(hash string, entry EchoMeta) error {
-	description, phrases, safety := entry.Serialize()
-
-	_, err := d.Exec("UPDATE echos SET description = ?, phrases = ?, safety = ? WHERE hash = ?", description, phrases, safety, hash)
 	if err != nil {
 		return err
 	}

@@ -200,7 +200,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	hub.BroadcastCreate(getUploadId(r), echo)
 
-	go echo.GenerateTags(context.Background(), false, false)
+	if vector != nil && echo.IsImage() && !echo.Animated {
+		go func() {
+			err := vector.IndexImage(context.Background(), echo.Hash, echo.Storage())
+			if err != nil {
+				log.Warnf("Failed to index image: %v\n", err)
+			} else {
+				log.Printf("Indexed image %s\n", echo.Hash)
+			}
+		}()
+	}
 
 	okay(w, "application/json")
 

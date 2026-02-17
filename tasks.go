@@ -132,20 +132,9 @@ func taskClearTags() error {
 		return nil
 	}
 
-	log.Print("Clearing tags from database... ")
-
-	_, err = database.Exec("UPDATE echos SET description = NULL, phrases = NULL, safety = NULL")
-	if err != nil {
-		log.Println("failed")
-
-		return err
-	}
-
-	log.Println("done")
-
 	log.Print("Removing vector database... ")
 
-	err = os.RemoveAll(TagsDirectory)
+	err = os.RemoveAll(ClipDirectory)
 	if err != nil {
 		log.Println("failed")
 

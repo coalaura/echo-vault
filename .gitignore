@@ -4,5 +4,6 @@ echo.db-wal
 storage
 backups
 tags
+clip
 config.yml
 echo_vault

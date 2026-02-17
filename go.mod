@@ -10,7 +10,8 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/mozillazg/go-unidecode v0.2.0
 	github.com/philippgille/chromem-go v0.7.0
-	github.com/revrost/go-openrouter v1.1.5
+	github.com/yalue/onnxruntime_go v1.26.0
+	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 )
 
 require (

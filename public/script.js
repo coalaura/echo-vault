@@ -26,7 +26,6 @@
 	const $loginView = document.getElementById("login-view"),
 		$dashboardView = document.getElementById("dashboard-view"),
 		$modalView = document.getElementById("modal-view"),
-		$modalTag = document.getElementById("modal-tag"),
 		$loginForm = document.getElementById("login-form"),
 		$apiToken = document.getElementById("api-token"),
 		$loginError = document.getElementById("login-error"),
@@ -43,11 +42,7 @@
 		$totalCount = document.getElementById("total-count"),
 		$versionTags = document.querySelectorAll(".version-tag"),
 		$modalViewContent = $modalView.querySelector(".modal-content"),
-		$modalViewBackdrop = $modalView.querySelector(".modal-backdrop"),
-		$modalTagBackdrop = $modalTag.querySelector(".modal-backdrop"),
-		$tagSelect = document.getElementById("tag-select"),
-		$tagCloseBtn = document.getElementById("tag-close-btn"),
-		$tagUpdateBtn = document.getElementById("tag-update-btn");
+		$modalViewBackdrop = $modalView.querySelector(".modal-backdrop");
 
 	let $notifyArea;
 
@@ -64,10 +59,6 @@
 		stats: {
 			size: 0,
 			count: 0,
-		},
-		config: {
-			noBlur: false,
-			ignoreSafety: [],
 		},
 		controllers: {
 			query: null,
@@ -347,7 +338,10 @@
 
 		actions.className = "echo-actions";
 
-		actions.append(makeActionButton(item.hash, "TAG", "tag"), makeActionButton(item.hash, "COPY", "copy"), makeActionButton(item.hash, "DEL", "delete", "delete"));
+		actions.append(
+			makeActionButton(item.hash, "COPY", "copy"),
+			makeActionButton(item.hash, "DEL", "delete", "delete"),
+		);
 
 		const info = document.createElement("div");
 
@@ -531,14 +525,6 @@
 	}
 
 	function updateEchoNode(node, item) {
-		const shouldBlur = !State.config.noBlur && item.safety && item.safety !== "ok" && !State.config.ignoreSafety.includes(item.safety);
-
-		node.classList.remove("blurred", "safety-suggestive", "safety-explicit", "safety-violence", "safety-sensitive");
-
-		if (shouldBlur) {
-			node.classList.add("blurred", `safety-${item.safety}`);
-		}
-
 		node.classList.toggle("bg-processing", State.processing.has(item.hash));
 
 		let simBadge = node.querySelector(".echo-similarity");
@@ -581,63 +567,6 @@
 
 		$modalViewContent.innerHTML = "";
 		$modalViewContent.style.width = "";
-
-		const infoBtn = document.createElement("button");
-
-		infoBtn.className = "media-info-btn";
-		infoBtn.textContent = "INFO";
-		infoBtn.title = "View description";
-
-		const descPanel = document.createElement("div");
-
-		descPanel.className = "media-description closed";
-
-		infoBtn.addEventListener("click", async event => {
-			event.stopPropagation();
-
-			if (!descPanel.classList.contains("closed")) {
-				descPanel.classList.add("closed");
-
-				infoBtn.classList.remove("active");
-
-				return;
-			}
-
-			if (descPanel.dataset.loaded === "true") {
-				descPanel.classList.remove("closed");
-
-				infoBtn.classList.add("active");
-
-				return;
-			}
-
-			infoBtn.classList.add("loading");
-
-			try {
-				const response = await fetchWithAuth(`/echo/${hash}`);
-
-				if (!response.ok) {
-					throw new Error("Failed to load");
-				}
-
-				const data = await response.json();
-
-				if (data?.description) {
-					descPanel.textContent = data.description;
-					descPanel.dataset.loaded = "true";
-
-					descPanel.classList.remove("closed");
-
-					infoBtn.classList.add("active");
-				} else {
-					showNotification("No description available", "info");
-				}
-			} catch {
-				showNotification("Failed to load description", "error");
-			} finally {
-				infoBtn.classList.remove("loading");
-			}
-		});
 
 		let media;
 
@@ -684,35 +613,15 @@
 			media.addEventListener("load", updateMeta);
 		}
 
-		media.addEventListener("click", () => {
-			descPanel.classList.add("closed");
-
-			infoBtn.classList.remove("active");
-		});
-
-		$modalViewContent.append(media, meta, infoBtn, descPanel);
+		$modalViewContent.append(media, meta);
 
 		$modalView.classList.remove("hidden");
 	}
 
 	function closeModals() {
-		$modalTag.classList.add("hidden");
 		$modalView.classList.add("hidden");
 
 		$modalViewContent.innerHTML = "";
-	}
-
-	function viewTagModal(hash) {
-		const item = State.cache.get(hash),
-			node = document.getElementById(`echo-${hash}`);
-
-		if (!item || node?.classList.contains("processing")) {
-			return;
-		}
-
-		$modalTag.classList.remove("hidden");
-		$modalTag.dataset.hash = hash;
-		$tagSelect.value = item.safety || "auto";
 	}
 
 	async function fetchServerInfo() {
@@ -730,14 +639,6 @@
 
 			if (data.queries) {
 				$searchWrapper.classList.remove("hidden");
-			}
-
-			if (!data.blur) {
-				State.config.noBlur = true;
-			}
-
-			if (data.ignore?.length) {
-				State.config.ignoreSafety = data.ignore;
 			}
 		} catch (err) {
 			console.error(`Failed to fetch info: ${err}`);
@@ -898,66 +799,6 @@
 			}
 
 			showNotification(err.message, "error");
-		}
-	}
-
-	async function updateTag(hash, tag) {
-		const node = document.getElementById(`echo-${hash}`);
-
-		if (!node || node.classList.contains("processing")) {
-			return;
-		}
-
-		closeModals();
-
-		State.busy++;
-
-		node.classList.add("processing");
-
-		let body;
-
-		if (tag === "auto") {
-			body = {
-				action: "re_tag",
-			};
-		} else {
-			body = {
-				action: "set_safety",
-				safety: tag,
-			};
-		}
-
-		try {
-			const response = await fetchWithAuth(`/echos/${hash}`, null, {
-				method: "PUT",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(body),
-			});
-
-			if (!response.ok) {
-				throw new Error(await parseResponseError(response));
-			}
-
-			const data = await response.json();
-
-			if (!data) {
-				throw new Error("invalid response");
-			}
-
-			renderBatch(data.echo, "update");
-
-			const newTag = data.echo.safety || "ok",
-				ignored = newTag !== "ok" && (State.config.noBlur || State.config.ignoreSafety.includes(newTag));
-
-			showNotification(`Re-Tag: ${newTag} ${ignored ? "(ignored)" : ""}`, "success");
-		} catch (err) {
-			showNotification(err.message, "error");
-		} finally {
-			node.classList.remove("processing");
-
-			State.busy--;
 		}
 	}
 
@@ -1348,9 +1189,7 @@
 
 				const { action, hash } = btn.dataset;
 
-				if (action === "tag") {
-					event.shiftKey ? updateTag(hash, "auto") : viewTagModal(hash);
-				} else if (action === "copy") {
+				if (action === "copy") {
 					copyLink(hash, btn);
 				} else if (action === "delete") {
 					deleteEcho(hash, event.shiftKey);
@@ -1474,25 +1313,12 @@
 		// Modals
 		$modalViewBackdrop.addEventListener("click", closeModals);
 
-		$modalTagBackdrop.addEventListener("click", closeModals);
-
-		$tagCloseBtn.addEventListener("click", closeModals);
-
 		document.addEventListener("keydown", event => {
 			if (event.key !== "Escape") {
 				return;
 			}
 
 			closeModals();
-		});
-
-		// Tag update
-		$tagUpdateBtn.addEventListener("click", () => {
-			if ($modalTag.classList.contains("hidden")) {
-				return;
-			}
-
-			updateTag($modalTag.dataset.hash, $tagSelect.value);
 		});
 
 		// Window unload
