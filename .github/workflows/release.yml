@@ -101,7 +101,6 @@ jobs:
           TAGS=""
         fi
 
-        # Only static link for linux-musl non-ai
         if [[ "${{ matrix.zig_target }}" == *"musl"* && "${{ matrix.ai }}" != "true" ]]; then
           LDFLAGS="-linkmode external -extldflags '-static'"
         else
