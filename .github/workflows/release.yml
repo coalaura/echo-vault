@@ -15,133 +15,164 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: windows-amd64
-            goos: windows
+          - goos: windows
             goarch: amd64
             zig_target: x86_64-windows-gnu
             ai: false
-            ext: .exe
+            out: echo_vault_windows-amd64_noai.exe
 
-          - name: windows-amd64-ai
-            goos: windows
-            goarch: amd64
-            zig_target: x86_64-windows-gnu
-            ai: true
-            ext: .exe
-
-          - name: linux-amd64
-            goos: linux
+          - goos: linux
             goarch: amd64
             zig_target: x86_64-linux-musl
             ai: false
-            ext: ""
+            out: echo_vault_linux-amd64_noai
 
-          - name: linux-amd64-ai
-            goos: linux
+          - goos: windows
+            goarch: amd64
+            zig_target: x86_64-windows-gnu
+            ai: true
+            out: echo_vault_windows-amd64_ai.tar.gz
+
+          - goos: linux
             goarch: amd64
             zig_target: x86_64-linux-gnu
             ai: true
-            ext: ""
+            out: echo_vault_linux-amd64_ai.tar.gz
+
       fail-fast: false
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Zig
-      uses: goto-bus-stop/setup-zig@v2
-      with:
-        version: 0.15.2
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 'lts/*'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
 
-    - name: Minify and cache-bust assets
-      run: |
-        npm install -g esbuild
+      - name: Minify and cache-bust assets
+        run: |
+          npm install -g esbuild
 
-        esbuild public/style.css --minify --outfile=public/style.min.css
-        esbuild public/script.js --minify --outfile=public/script.min.js
+          esbuild public/style.css --minify --outfile=public/style.min.css
+          esbuild public/script.js --minify --outfile=public/script.min.js
 
-        CSS_HASH=$(sha256sum public/style.min.css | cut -c1-8)
-        JS_HASH=$(sha256sum public/script.min.js | cut -c1-8)
+          CSS_HASH=$(sha256sum public/style.min.css | cut -c1-8)
+          JS_HASH=$(sha256sum public/script.min.js | cut -c1-8)
 
-        mv public/style.min.css "public/style.${CSS_HASH}.css"
-        mv public/script.min.js "public/script.${JS_HASH}.js"
+          mv public/style.min.css "public/style.${CSS_HASH}.css"
+          mv public/script.min.js "public/script.${JS_HASH}.js"
 
-        sed -i "s/style\.css/style.${CSS_HASH}.css/g" public/index.html
-        sed -i "s/script\.js/script.${JS_HASH}.js/g" public/index.html
+          sed -i "s/style\.css/style.${CSS_HASH}.css/g" public/index.html
+          sed -i "s/script\.js/script.${JS_HASH}.js/g" public/index.html
 
-        rm public/style.css public/script.js
+          rm public/style.css public/script.js
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: 'go.mod'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
-    - name: Build ${{ matrix.goos }}_${{ matrix.goarch }}
-      shell: bash
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 1
-        CC: zig cc -target ${{ matrix.zig_target }}
-        CXX: zig c++ -target ${{ matrix.zig_target }}
-      run: |
-        mkdir -p build
-        [[ "$GOOS" == "windows" ]] && EXT=".exe" || EXT=""
+      - name: Build & Package (${{ matrix.goos }} ${{ matrix.goarch }} ai=${{ matrix.ai }})
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 1
+          CC: zig cc -target ${{ matrix.zig_target }}
+          CXX: zig c++ -target ${{ matrix.zig_target }}
+        run: |
+          set -euo pipefail
+          mkdir -p build
 
-        OUT="build/${{ matrix.name }}${EXT}"
+          if [[ "${{ matrix.ai }}" == "true" ]]; then
+            TAGS="-tags ai"
+          else
+            TAGS=""
+          fi
 
-        if [[ "${{ matrix.ai }}" == "true" ]]; then
-          TAGS="-tags ai"
-        else
-          TAGS=""
-        fi
+          # Static only for linux-musl
+          if [[ "${{ matrix.zig_target }}" == *"musl"* && "${{ matrix.ai }}" != "true" ]]; then
+            LDFLAGS="-linkmode external -extldflags '-static'"
+          else
+            LDFLAGS=""
+          fi
 
-        if [[ "${{ matrix.zig_target }}" == *"musl"* && "${{ matrix.ai }}" != "true" ]]; then
-          LDFLAGS="-linkmode external -extldflags '-static'"
-        else
-          LDFLAGS=""
-        fi
+          BIN_EXT=""
+          [[ "$GOOS" == "windows" ]] && BIN_EXT=".exe"
+          BIN_TMP="build/_tmp_echo_vault${BIN_EXT}"
 
-        go build \
-          $TAGS \
-          -trimpath \
-          -buildvcs=false \
-          -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}' $LDFLAGS" \
-          -o "$OUT" .
+          go build \
+            $TAGS \
+            -trimpath \
+            -buildvcs=false \
+            -ldflags "-s -w -X 'main.Version=${{ github.ref_name }}' $LDFLAGS" \
+            -o "$BIN_TMP" .
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.name }}
-        path: |
-          build/${{ matrix.name }}${{ matrix.ai && '.tar.gz' || matrix.ext }}
+          if [[ "${{ matrix.ai }}" != "true" ]]; then
+            mv "$BIN_TMP" "build/${{ matrix.out }}"
+            exit 0
+          fi
+
+          # AI: create tar.gz with: ./echo_vault(.exe) + ./onnx/ (filtered to platform)
+          STAGE="build/_stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+
+          # Put binary in the tarball with a simple name
+          mv "$BIN_TMP" "$STAGE/echo_vault${BIN_EXT}"
+          if [[ "$GOOS" == "linux" ]]; then
+            chmod +x "$STAGE/echo_vault"
+          fi
+
+          # Copy models
+          mkdir -p "$STAGE/onnx/models"
+          cp -R onnx/models/* "$STAGE/onnx/models/"
+
+          # Copy only relevant platform libs
+          if [[ "$GOOS" == "windows" ]]; then
+            PLAT="windows-amd64"
+          else
+            PLAT="linux-amd64"
+          fi
+          mkdir -p "$STAGE/onnx/lib/$PLAT"
+          cp -R "onnx/lib/$PLAT/"* "$STAGE/onnx/lib/$PLAT/"
+
+          # Create tarball
+          tar -czf "build/${{ matrix.out }}" -C "$STAGE" .
+
+          # Cleanup
+          rm -rf "$STAGE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: build/${{ matrix.out }}
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
 
-    - name: Download all build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
+      - name: Flatten artifacts
+        run: |
+          mkdir -p ./build
+          find ./artifacts -type f -maxdepth 2 -exec cp {} ./build/ \;
 
-    - name: Flatten artifacts
-      run: |
-        mkdir -p ./build
-        find ./artifacts -type f -exec cp {} ./build/ \;
-
-    - name: Create GitHub release
-      uses: softprops/action-gh-release@v2
-      with:
-        files: ./build/**
-        name: "Release ${{ github.ref_name }}"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./build/**
+          name: "Release ${{ github.ref_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
