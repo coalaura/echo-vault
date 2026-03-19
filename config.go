@@ -204,9 +204,9 @@ func (e *EchoConfig) Store() error {
 		"$.images.effort":  {yaml.HeadComment(fmt.Sprintf(" quality/speed trade-off (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.Images.Effort))},
 		"$.images.quality": {yaml.HeadComment(fmt.Sprintf(" webp quality (0-100, 100 = lossless; default: %v)", def.Images.Quality))},
 
-		"$.videos.enabled": {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg/ffprobe; default: %v)", def.Videos.Enabled))},
+		"$.videos.enabled": {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg; default: %v)", def.Videos.Enabled))},
 
-		"$.gifs.enabled": {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
+		"$.gifs.enabled": {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg when using gif as target; default: %v)", def.GIFs.Enabled))},
 		"$.gifs.format":  {yaml.HeadComment(fmt.Sprintf(" target format for gifs (gif or webp; default: %v)", def.GIFs.Format))},
 	}
 
