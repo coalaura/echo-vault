@@ -77,29 +77,16 @@ images:
   quality: 90
 
 videos:
-  # allow video uploads (requires ffmpeg/ffprobe; default: false)
+  # allow video uploads (requires ffmpeg; default: false)
   enabled: false
   # target format for videos (mp4, webm, mov, m4v, mkv or gif; default: mp4)
   format: mp4
-  # optimize videos (compresses and re-encodes; default: true)
-  optimize: true
 
 gifs:
-  # allow gif uploads (requires ffmpeg/ffprobe; default: false)
-  enabled: false
-  # optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: true)
-  optimize: true
-  # gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: 2)
-  effort: 2
-  # visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: 90)
-  quality: 90
-  # maximum colors in GIF palette (2-256; smaller = smaller files; default: 256)
-  max_colors: 256
-  # maximum fps (1 - 30; default: 15)
-  max_framerate: 15
-  # maximum width/height (1 - 1024; default: 480)
-  max_width: 480
-
+  # allow gif uploads (requires ffmpeg if target is gif; default: false)
+  enabled: true
+  # target format for gifs (gif or webp; default: webp)
+  format: webp
 ai:
   # openrouter token for image tagging (if empty, disables image tagging; default: )
   openrouter_token: ""

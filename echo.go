@@ -145,30 +145,9 @@ func (e *Echo) SaveUploadedFile(ctx context.Context, path string) (int64, error)
 			return saveGIFAsAnimatedWebP(path, e.Storage())
 		}
 
-		return saveGIFAsGIF(ctx, path, e.Storage())
+		return remuxVideo(ctx, path, e.Storage(), e.Extension)
 	case "mp4", "webm", "mov", "m4v", "mkv":
-		e.Extension = config.Videos.Format
-
-		switch e.Extension {
-		case "mp4":
-			return saveVideoAsMP4(ctx, path, e.Storage())
-		case "webm":
-			return saveVideoAsWebM(ctx, path, e.Storage())
-		case "mov":
-			return saveVideoAsMOV(ctx, path, e.Storage())
-		case "m4v":
-			return saveVideoAsM4V(ctx, path, e.Storage())
-		case "mkv":
-			return saveVideoAsMKV(ctx, path, e.Storage())
-		case "gif":
-			e.Animated = true
-
-			return saveVideoAsGIF(ctx, path, e.Storage())
-		case "webp":
-			e.Animated = true
-
-			return saveVideoAsWebP(ctx, path, e.Storage())
-		}
+		return remuxVideo(ctx, path, e.Storage(), e.Extension)
 	}
 
 	return 0, fmt.Errorf("unsupported extension %q", e.Extension)

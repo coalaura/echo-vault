@@ -34,26 +34,16 @@ type EchoConfigImages struct {
 }
 
 type EchoConfigVideos struct {
-	Enabled  bool   `yaml:"enabled"`
-	Format   string `yaml:"format"`
-	Optimize bool   `yaml:"optimize"`
+	Enabled bool `yaml:"enabled"`
 }
 
 type EchoConfigGIFs struct {
-	Enabled      bool   `yaml:"enabled"`
-	Format       string `yaml:"format"`
-	Optimize     bool   `yaml:"optimize"`
-	Effort       int    `yaml:"effort"`
-	Quality      int    `yaml:"quality"`
-	MaxColors    int    `yaml:"max_colors"`
-	MaxFramerate int    `yaml:"max_framerate"`
-	MaxWidth     int    `yaml:"max_width"`
+	Enabled bool   `yaml:"enabled"`
+	Format  string `yaml:"format"`
 }
 
 type EchoConfig struct {
-	ffmpeg   string
-	ffprobe  string
-	gifsicle string
+	ffmpeg string
 
 	Server EchoConfigServer `yaml:"server"`
 	Backup EchoConfigBackup `yaml:"backup"`
@@ -85,19 +75,11 @@ func NewDefaultConfig() EchoConfig {
 			Quality: 90,
 		},
 		Videos: EchoConfigVideos{
-			Enabled:  false,
-			Format:   "mp4",
-			Optimize: true,
+			Enabled: false,
 		},
 		GIFs: EchoConfigGIFs{
-			Enabled:      false,
-			Format:       "webp",
-			Optimize:     true,
-			Effort:       2,
-			Quality:      90,
-			MaxColors:    256,
-			MaxFramerate: 15,
-			MaxWidth:     480,
+			Enabled: true,
+			Format:  "webp",
 		},
 	}
 }
@@ -175,63 +157,19 @@ func (c *EchoConfig) Validate() error {
 		return fmt.Errorf("images.quality must be 1-100, got %d", c.Images.Quality)
 	}
 
-	// videos
-	if !c.IsValidVideoFormat(c.Videos.Format, false) {
-		return fmt.Errorf("videos.format must be one of (mp4, webm, mov, m4v, mkv, gif), got %q", c.Videos.Format)
-	}
-
 	// gifs
 	if c.GIFs.Format != "gif" && c.GIFs.Format != "webp" {
 		return fmt.Errorf("gifs.format must be one of (gif, webp), got %q", c.GIFs.Format)
 	}
 
-	if c.GIFs.Effort < 1 || c.GIFs.Effort > 3 {
-		return fmt.Errorf("gifs.effort must be 1-3, got %d", c.GIFs.Effort)
-	}
-
-	if c.GIFs.Quality < 1 || c.GIFs.Quality > 100 {
-		return fmt.Errorf("gifs.quality must be 1-100, got %d", c.GIFs.Quality)
-	}
-
-	if c.GIFs.MaxColors < 2 || c.GIFs.MaxColors > 256 {
-		return fmt.Errorf("gifs.max_colors must be 2-256, got %d", c.GIFs.MaxColors)
-	}
-
-	if c.GIFs.MaxFramerate < 1 || c.GIFs.MaxFramerate > 30 {
-		return fmt.Errorf("gifs.max_framerate must be 1-30, got %d", c.GIFs.MaxFramerate)
-	}
-
-	if c.GIFs.MaxWidth < 1 || c.GIFs.MaxWidth > 1024 {
-		return fmt.Errorf("gifs.max_width must be 1-1024, got %d", c.GIFs.MaxWidth)
-	}
-
 	// check ffmpeg dependency
-	if c.Videos.Enabled || c.GIFs.Enabled {
+	if c.Videos.Enabled || (c.GIFs.Enabled && c.GIFs.Format == "gif") {
 		ffmpeg, err := exec.LookPath("ffmpeg")
 		if err != nil {
-			return errors.New("ffmpeg is required for video/gif/a-webp input")
+			return errors.New("ffmpeg is required for video/gif in/output")
 		}
 
 		c.ffmpeg = ffmpeg
-
-		if c.Videos.Format == "gif" || c.Videos.Format == "webp" || c.GIFs.Enabled {
-			ffprobe, err := exec.LookPath("ffprobe")
-			if err != nil {
-				return errors.New("ffprobe is required for gif/a-webp input/output")
-			}
-
-			c.ffprobe = ffprobe
-		}
-	}
-
-	// check gifsicle dependency
-	if (c.GIFs.Enabled || (c.Videos.Enabled && c.Videos.Format == "gif")) && c.GIFs.Optimize {
-		gifsicle, err := exec.LookPath("gifsicle")
-		if err != nil {
-			return errors.New("gifsicle is required for gifs.optimize")
-		}
-
-		c.gifsicle = gifsicle
 	}
 
 	return nil
@@ -266,18 +204,10 @@ func (e *EchoConfig) Store() error {
 		"$.images.effort":  {yaml.HeadComment(fmt.Sprintf(" quality/speed trade-off (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.Images.Effort))},
 		"$.images.quality": {yaml.HeadComment(fmt.Sprintf(" webp quality (0-100, 100 = lossless; default: %v)", def.Images.Quality))},
 
-		"$.videos.enabled":  {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg/ffprobe; default: %v)", def.Videos.Enabled))},
-		"$.videos.format":   {yaml.HeadComment(fmt.Sprintf(" target format for videos (mp4, webm, mov, m4v, mkv, gif or webp; default: %v)", def.Videos.Format))},
-		"$.videos.optimize": {yaml.HeadComment(fmt.Sprintf(" optimize videos (compresses and re-encodes; default: %v)", def.Videos.Optimize))},
+		"$.videos.enabled": {yaml.HeadComment(fmt.Sprintf(" allow video uploads (requires ffmpeg/ffprobe; default: %v)", def.Videos.Enabled))},
 
-		"$.gifs.enabled":       {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
-		"$.gifs.format":        {yaml.HeadComment(fmt.Sprintf(" target format for gifs (gif or webp; default: %v)", def.GIFs.Format))},
-		"$.gifs.optimize":      {yaml.HeadComment(fmt.Sprintf(" optimize gifs (compresses and re-encodes; including video.format = gif; requires gifsicle; default: %v)", def.GIFs.Optimize))},
-		"$.gifs.effort":        {yaml.HeadComment(fmt.Sprintf(" gifsicle optimization effort (1 = fast/big, 2 = medium, 3 = slow/small; default: %v)", def.GIFs.Effort))},
-		"$.gifs.quality":       {yaml.HeadComment(fmt.Sprintf(" visual quality (1 - 100; 100=lossless; lower values enable gifsicle --lossy and increase compression; default: %v)", def.GIFs.Quality))},
-		"$.gifs.max_colors":    {yaml.HeadComment(fmt.Sprintf(" maximum colors in GIF palette (2-256; smaller = smaller files; default: %v)", def.GIFs.MaxColors))},
-		"$.gifs.max_framerate": {yaml.HeadComment(fmt.Sprintf(" maximum fps (1 - 30; default: %v)", def.GIFs.MaxFramerate))},
-		"$.gifs.max_width":     {yaml.HeadComment(fmt.Sprintf(" maximum width/height (1 - 1024; default: %v)", def.GIFs.MaxWidth))},
+		"$.gifs.enabled": {yaml.HeadComment(fmt.Sprintf(" allow gif uploads (requires ffmpeg/ffprobe; default: %v)", def.GIFs.Enabled))},
+		"$.gifs.format":  {yaml.HeadComment(fmt.Sprintf(" target format for gifs (gif or webp; default: %v)", def.GIFs.Format))},
 	}
 
 	file, err := OpenFileForWriting("config.yml")
