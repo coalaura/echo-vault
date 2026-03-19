@@ -14,8 +14,6 @@ func runFFMpeg(ctx context.Context, in, out string, args []string) (int64, error
 
 	cmd := exec.CommandContext(ctx, config.ffmpeg, args...)
 
-	log.Println(config.ffmpeg, args)
-
 	var stderr bytes.Buffer
 
 	cmd.Stdout = os.Stdout
