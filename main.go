@@ -107,6 +107,7 @@ func main() {
 		gr.Get("/query/{page}", queryEchosHandler)
 
 		gr.Post("/upload", uploadHandler)
+		gr.Patch("/echos/{hash}/favorite", toggleFavoriteHandler)
 		gr.Delete("/echos/{hash}", deleteEchoHandler)
 	})
 

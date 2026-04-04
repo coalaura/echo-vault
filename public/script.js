@@ -38,6 +38,7 @@
 		$fileInput = document.getElementById("file-input"),
 		$uploadBtn = document.getElementById("upload-trigger"),
 		$logoutBtn = document.getElementById("logout-btn"),
+		$favoritesBtn = document.getElementById("favorites-btn"),
 		$totalSize = document.getElementById("total-size"),
 		$totalCount = document.getElementById("total-count"),
 		$versionTags = document.querySelectorAll(".version-tag"),
@@ -54,6 +55,7 @@
 		busy: 0,
 		hasMore: true,
 		query: "",
+		favorites: false,
 		cache: new Map(),
 		processing: new Map(),
 		stats: {
@@ -213,7 +215,7 @@
 		const loader = document.createElement("div");
 
 		loader.className = "media-loader";
-		loader.innerHTML = '<span class="spinner"></span>';
+		loader.innerHTML = `<span class="spinner"></span>`;
 
 		link.appendChild(loader);
 
@@ -339,6 +341,7 @@
 		actions.className = "echo-actions";
 
 		actions.append(
+			makeActionButton(item.hash, "FAVORITE", "favorite", "favorite"),
 			makeActionButton(item.hash, "COPY", "copy"),
 			makeActionButton(item.hash, "DEL", "delete", "delete"),
 		);
@@ -378,7 +381,7 @@
 		const overlay = document.createElement("div");
 
 		overlay.className = "upload-overlay";
-		overlay.innerHTML = '<span class="spinner"></span><span class="upload-text">UPLOADING...</span>';
+		overlay.innerHTML = `<span class="spinner"></span><span class="upload-text">UPLOADING...</span>`;
 
 		link.appendChild(overlay);
 
@@ -526,6 +529,13 @@
 
 	function updateEchoNode(node, item) {
 		node.classList.toggle("bg-processing", State.processing.has(item.hash));
+		node.classList.toggle("favorited", !!item.favorited);
+
+		const favBtn = node.querySelector(`[data-action="favorite"]`);
+
+		if (favBtn) {
+			favBtn.classList.toggle("active", !!item.favorited);
+		}
 
 		let simBadge = node.querySelector(".echo-similarity");
 
@@ -672,9 +682,11 @@
 		State.page = 1;
 		State.hasMore = true;
 		State.query = "";
+		State.favorites = false;
 		State.cache.clear();
 
 		$searchInput.value = "";
+		$favoritesBtn.classList.remove("active");
 
 		localStorage.removeItem(StorageKey);
 
@@ -703,7 +715,17 @@
 		let aborted = false;
 
 		try {
-			const endpoint = State.query ? `/query/${State.page}?q=${encodeURIComponent(State.query)}` : `/echos/${State.page}`;
+			let endpoint;
+
+			if (State.query) {
+				endpoint = `/query/${State.page}?q=${encodeURIComponent(State.query)}`;
+			} else {
+				endpoint = `/echos/${State.page}`;
+			}
+
+			if (State.favorites) {
+				endpoint += `${endpoint.includes("?") ? "&" : "?"}favorites=1`;
+			}
 
 			const response = await fetchWithAuth(endpoint, null, {
 				signal: controller.signal,
@@ -838,6 +860,51 @@
 		}
 	}
 
+	async function toggleFavorite(hash) {
+		const node = document.getElementById(`echo-${hash}`);
+
+		if (!node || node.classList.contains("processing")) {
+			return;
+		}
+
+		const favBtn = node.querySelector(`[data-action="favorite"]`);
+
+		if (favBtn) {
+			favBtn.disabled = true;
+		}
+
+		try {
+			const response = await fetchWithAuth(`/echos/${hash}/favorite`, null, {
+				method: "PATCH",
+			});
+
+			if (!response.ok) {
+				throw new Error(await parseResponseError(response));
+			}
+
+			const data = await response.json(),
+				item = State.cache.get(hash);
+
+			if (item) {
+				item.favorited = !!data.favorited;
+			}
+
+			if (favBtn) {
+				favBtn.classList.toggle("active", !!data.favorited);
+			}
+
+			const card = node.closest?.(".echo-card") || node;
+
+			card.classList.toggle("favorited", !!data.favorited);
+		} catch (error) {
+			showNotification(error.message, "error");
+		} finally {
+			if (favBtn) {
+				favBtn.disabled = false;
+			}
+		}
+	}
+
 	function removeLocalEcho(hash) {
 		const item = State.cache.get(hash),
 			node = document.getElementById(`echo-${hash}`);
@@ -888,6 +955,10 @@
 						}
 					}
 
+					if (State.favorites && !echo.favorited) {
+						return;
+					}
+
 					const exists = document.getElementById(`echo-${echo.hash}`);
 
 					if (!exists) {
@@ -899,8 +970,20 @@
 			}
 			case 1: {
 				// Update
-				if (State.cache.has(targetHash) && echo) {
-					renderBatch(echo, "update");
+				if (echo) {
+					State.cache.set(echo.hash, echo);
+
+					if (State.favorites && !echo.favorited) {
+						removeLocalEcho(echo.hash);
+
+						return;
+					}
+
+					const node = document.getElementById(`echo-${echo.hash}`);
+
+					if (node) {
+						updateEchoNode(node, echo);
+					}
 				}
 
 				break;
@@ -1129,6 +1212,19 @@
 
 		$logoutBtn.addEventListener("click", () => logout(true));
 
+		$favoritesBtn.addEventListener("click", () => {
+			State.favorites = !State.favorites;
+			State.page = 1;
+			State.hasMore = true;
+			State.cache.clear();
+
+			$favoritesBtn.classList.toggle("active", State.favorites);
+
+			$gallery.innerHTML = "";
+
+			loadEchos();
+		});
+
 		// Search
 		let debounceTimer;
 
@@ -1191,6 +1287,8 @@
 
 				if (action === "copy") {
 					copyLink(hash, btn);
+				} else if (action === "favorite") {
+					toggleFavorite(hash);
 				} else if (action === "delete") {
 					deleteEcho(hash, event.shiftKey);
 				}

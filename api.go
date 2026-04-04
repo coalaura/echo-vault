@@ -130,7 +130,17 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	echos, err := database.FindAll(r.Context(), (page-1)*PageSize, PageSize)
+	favorites := r.URL.Query().Get("favorites") == "true"
+
+	var echos []Echo
+	var err error
+
+	if favorites {
+		echos, err = database.FindFavorites(r.Context(), (page-1)*PageSize, PageSize)
+	} else {
+		echos, err = database.FindAll(r.Context(), (page-1)*PageSize, PageSize)
+	}
+
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
 
@@ -262,7 +272,9 @@ func queryEchosHandler(w http.ResponseWriter, r *http.Request) {
 			scoreMap[res.Hash] = res.Similarity
 		}
 
-		results, err := database.FindByHashes(ctx, hashes)
+		favoritesOnly := r.URL.Query().Get("favorites") == "1"
+
+		results, err := database.FindByHashes(ctx, hashes, favoritesOnly)
 		if err != nil {
 			abort(w, http.StatusInternalServerError, "database error")
 
@@ -303,4 +315,43 @@ func parsePage(r *http.Request) int {
 	}
 
 	return max(1, page)
+}
+
+func toggleFavoriteHandler(w http.ResponseWriter, r *http.Request) {
+	hash := chi.URLParam(r, "hash")
+	if !validateHash(hash) {
+		abort(w, http.StatusBadRequest, "invalid hash format")
+
+		log.Warnln("favorite: invalid hash")
+
+		return
+	}
+
+	favorited, err := database.ToggleFavorite(r.Context(), hash)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "database error")
+
+		log.Warnln("favorite: failed to toggle")
+		log.Warnln(err)
+
+		return
+	}
+
+	echo, err := database.Find(r.Context(), hash)
+	if err != nil {
+		abort(w, http.StatusInternalServerError, "database error")
+
+		log.Warnln("favorite: failed to find echo after toggle")
+		log.Warnln(err)
+
+		return
+	}
+
+	hub.BroadcastUpdate(echo)
+
+	okay(w, "application/json")
+
+	json.NewEncoder(w).Encode(map[string]any{
+		"favorited": favorited,
+	})
 }

@@ -54,8 +54,10 @@ func ConnectToDatabase() (*EchoDatabase, error) {
 	table.Column("size", "INTEGER").NotNull().Default("0")
 	table.Column("upload_size", "INTEGER").NotNull().Default("0")
 	table.Column("timestamp", "INTEGER").NotNull().Default("0")
+	table.Column("favorited", "INTEGER").NotNull().Default("0")
 
 	table.Index("idx_echos_timestamp", "timestamp")
+	table.Index("idx_echos_favorited", "favorited")
 
 	err = schema.Apply()
 	if err != nil {
@@ -81,7 +83,7 @@ func (d *EchoDatabase) Exists(hash string) (bool, error) {
 func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 	var e Echo
 
-	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
+	err := d.QueryRowContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &e.Favorited)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -93,7 +95,7 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 }
 
 func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +107,7 @@ func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, 
 	for rows.Next() {
 		var e Echo
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &e.Favorited)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +123,7 @@ func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, 
 	return echos, nil
 }
 
-func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Echo, error) {
+func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string, favoritesOnly bool) ([]Echo, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
@@ -131,9 +133,15 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 
 	var b strings.Builder
 
-	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp FROM echos WHERE hash IN (")
+	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos WHERE hash IN (")
 	b.WriteString(placeholders)
-	b.WriteString(") ORDER BY CASE hash ")
+	b.WriteString(")")
+
+	if favoritesOnly {
+		b.WriteString(" AND favorited = 1")
+	}
+
+	b.WriteString(" ORDER BY CASE hash ")
 
 	for i := range hashes {
 		b.WriteString("WHEN ? THEN ")
@@ -165,7 +173,7 @@ func (d *EchoDatabase) FindByHashes(ctx context.Context, hashes []string) ([]Ech
 	for rows.Next() {
 		var e Echo
 
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp)
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &e.Favorited)
 		if err != nil {
 			return nil, err
 		}
@@ -220,6 +228,56 @@ func (d *EchoDatabase) SetSize(hash string, size int64) error {
 	}
 
 	return nil
+}
+
+func (d *EchoDatabase) ToggleFavorite(ctx context.Context, hash string) (bool, error) {
+	var favorited bool
+
+	err := d.QueryRowContext(ctx, "SELECT favorited FROM echos WHERE hash = ? LIMIT 1", hash).Scan(&favorited)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+
+	newVal := !favorited
+
+	_, err = d.Exec("UPDATE echos SET favorited = ? WHERE hash = ?", newVal, hash)
+	if err != nil {
+		return false, err
+	}
+
+	return newVal, nil
+}
+
+func (d *EchoDatabase) FindFavorites(ctx context.Context, offset, limit int) ([]Echo, error) {
+	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos WHERE favorited = 1 ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var echos []Echo
+
+	for rows.Next() {
+		var e Echo
+
+		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &e.Favorited)
+		if err != nil {
+			return nil, err
+		}
+
+		echos = append(echos, e)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return echos, nil
 }
 
 func (d *EchoDatabase) Verify() (uint64, uint64, error) {

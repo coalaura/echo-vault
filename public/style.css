@@ -10,9 +10,13 @@
 	--accent: #ffffff;
 	--danger: #ff5555;
 	--success: #55ff55;
+	--favorite: #ffd866;
 
 	--font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	--favorite-empty: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48cGF0aCBmaWxsPSIjZWVlIiBkPSJNMzIwLjEgMzJjOSAwIDE3LjMgNS4xIDIxLjQgMTMuMUw0MTUgMTg5LjNsMTU5LjkgMjUuNGM4LjkgMS40IDE2LjMgNy43IDE5LjEgMTYuM3MuNSAxOC01LjggMjQuNEw0NzMuNyAzNjkuOSA0OTkgNTI5LjhjMS40IDguOS0yLjMgMTcuOS05LjYgMjMuMnMtMTcgNi4xLTI1IDJsLTE0NC4zLTczLjRMMTc1LjggNTU1Yy04IDQuMS0xNy43IDMuMy0yNS0ycy0xMS0xNC4yLTkuNi0yMy4ybDI1LjItMTU5LjlMNTIgMjU1LjRjLTYuNC02LjQtOC42LTE1LjgtNS44LTI0LjRzMTAuMS0xNC45IDE5LjEtMTYuM2wxNTkuOS0yNS40IDczLjYtMTQ0LjJjNC4xLTggMTIuNC0xMy4xIDIxLjQtMTMuMXptMCA3Ni44TDI2Mi4zIDIyMmMtMy41IDYuOC0xMCAxMS42LTE3LjYgMTIuOGwtMTI1LjUgMjAgODkuOCA4OS45YzUuNCA1LjQgNy45IDEzLjEgNi43IDIwLjdsLTE5LjggMTI1LjUgMTEzLjMtNTcuNmM2LjgtMy41IDE0LjktMy41IDIxLjggMGwxMTMuMyA1Ny42LTE5LjgtMTI1LjVjLTEuMi03LjYgMS4zLTE1LjMgNi43LTIwLjdsODkuOC04OS45LTEyNS41LTIwYy03LjYtMS4yLTE0LjEtNi0xNy42LTEyLjh6Ii8+PC9zdmc+);
+	--favorite-full: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NDAgNjQwIj48cGF0aCBmaWxsPSIjZmZkODY2IiBkPSJNMzQxLjUgNDUuMWMtNC4xLTgtMTIuNC0xMy4xLTIxLjQtMTMuMXMtMTcuMyA1LjEtMjEuNCAxMy4xbC03My42IDE0NC4yLTE1OS45IDI1LjRjLTguOSAxLjQtMTYuMyA3LjctMTkuMSAxNi4zcy0uNSAxOCA1LjggMjQuNGwxMTQuNCAxMTQuNS0yNS4yIDE1OS45Yy0xLjQgOC45IDIuMyAxNy45IDkuNiAyMy4yczE2LjkgNi4xIDI1IDJsMTQ0LjQtNzMuNEw0NjQuNCA1NTVjOCA0LjEgMTcuNyAzLjMgMjUtMnMxMS0xNC4yIDkuNi0yMy4ybC0yNS4zLTE1OS45IDExNC40LTExNC41YzYuNC02LjQgOC42LTE1LjggNS44LTI0LjRzLTEwLjEtMTQuOS0xOS4xLTE2LjNMNDE1IDE4OS4zeiIvPjwvc3ZnPg==);
 }
 
 * {
@@ -253,11 +257,25 @@ header {
 	aspect-ratio: 16 / 9;
 	background: var(--surface);
 	border: 1px solid var(--border);
-	overflow: hidden;
 	transition:
 		border-color 0.2s,
 		box-shadow 0.2s;
 	cursor: pointer;
+}
+
+.echo-card.favorited {
+	border-color: var(--favorite);
+}
+
+.echo-card.favorited::before {
+	content: "";
+	position: absolute;
+	top: -0.6rem;
+	right: -0.6rem;
+	width: 1.2rem;
+	height: 1.2rem;
+	background-image: var(--favorite-full);
+	transform: rotate(30deg);
 }
 
 .echo-card:hover {
@@ -452,6 +470,54 @@ header {
 .action-btn.delete:hover {
 	background: var(--danger);
 	color: white;
+}
+
+.action-btn.favorite {
+	color: var(--text-muted);
+	width: 1.4rem;
+	height: 1.4rem;
+	padding: 0;
+	background-image: var(--favorite-empty);
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 0.9rem;
+	font-size: 0;
+}
+
+.action-btn.favorite.active {
+	background-image: var(--favorite-full);
+}
+
+.action-btn.favorite.active {
+	color: var(--favorite);
+	border-color: var(--favorite);
+}
+
+.action-btn.favorite.active:hover {
+	background: var(--favorite);
+	color: var(--bg);
+}
+
+#favorites-btn {
+	background: transparent;
+	color: var(--text-muted);
+	border: 1px solid var(--border);
+	padding: 0.5rem 1rem;
+}
+
+#favorites-btn:hover {
+	border-color: var(--text-muted);
+	color: var(--text-main);
+}
+
+#favorites-btn.active {
+	color: var(--favorite);
+	border-color: var(--favorite);
+}
+
+#favorites-btn.active:hover {
+	background: var(--favorite);
+	color: var(--bg);
 }
 
 .echo-info {
@@ -757,6 +823,11 @@ header {
 		font-size: 0.75rem;
 	}
 
+	#favorites-btn {
+		padding: 0.6rem 0.8rem;
+		font-size: 0.75rem;
+	}
+
 	#notification-area {
 		bottom: 1rem;
 		right: 1rem;
@@ -782,7 +853,8 @@ header {
 	}
 
 	#upload-trigger,
-	#logout-btn {
+	#logout-btn,
+	#favorites-btn {
 		width: 50%;
 	}
 }

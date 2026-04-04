@@ -17,6 +17,7 @@ type Echo struct {
 	Size       int64  `json:"size"`
 	UploadSize int64  `json:"upload_size"`
 	Timestamp  int64  `json:"timestamp"`
+	Favorited  bool   `json:"favorited"`
 
 	Safety     string  `json:"safety,omitempty"`
 	Similarity float32 `json:"similarity,omitempty"`
