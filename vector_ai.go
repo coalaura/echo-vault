@@ -160,7 +160,7 @@ func resolveONNX(onnxRoot string) (libDir, ortLib, modelsDir string, err error) 
 		ortLib = filepath.Join(libDir, "onnxruntime.dll")
 	case "linux":
 		libDir = filepath.Join(onnxRoot, "lib", "linux-amd64")
-		ortLib = filepath.Join(libDir, "libonnxruntime.so.1.24.1")
+		ortLib = filepath.Join(libDir, "libonnxruntime.so")
 	default:
 		return "", "", "", err
 	}
