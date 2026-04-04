@@ -46,12 +46,12 @@ func main() {
 	config, err = LoadConfig()
 	log.MustFail(err)
 
-	log.Println("Loading vector store...")
+	if AIEnabled {
+		log.Println("Loading vector store...")
 
-	vector, err = LoadVectorStore()
-	log.MustFail(err)
+		vector, err = LoadVectorStore()
+		log.MustFail(err)
 
-	if vector != nil {
 		defer vector.Close()
 	}
 

@@ -13,6 +13,8 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 )
 
+const AIEnabled = true
+
 type VectorStore struct {
 	db         *chromem.DB
 	collection *chromem.Collection

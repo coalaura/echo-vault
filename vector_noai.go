@@ -4,6 +4,8 @@ package main
 
 import "context"
 
+const AIEnabled = false
+
 type VectorStore struct{}
 
 func LoadVectorStore() (*VectorStore, error) {
