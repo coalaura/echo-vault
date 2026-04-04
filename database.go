@@ -94,8 +94,18 @@ func (d *EchoDatabase) Find(ctx context.Context, hash string) (*Echo, error) {
 	return &e, nil
 }
 
-func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
+func (d *EchoDatabase) FindAll(ctx context.Context, offset, limit int, favoritesOnly bool) ([]Echo, error) {
+	var b strings.Builder
+
+	b.WriteString("SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos")
+
+	if favoritesOnly {
+		b.WriteString(" WHERE favorited = 1")
+	}
+
+	b.WriteString(" ORDER BY timestamp DESC LIMIT ? OFFSET ?")
+
+	rows, err := d.QueryContext(ctx, b.String(), limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -251,35 +261,6 @@ func (d *EchoDatabase) ToggleFavorite(ctx context.Context, hash string) (bool, e
 	return newVal, nil
 }
 
-func (d *EchoDatabase) FindFavorites(ctx context.Context, offset, limit int) ([]Echo, error) {
-	rows, err := d.QueryContext(ctx, "SELECT id, hash, name, extension, animated, size, upload_size, timestamp, favorited FROM echos WHERE favorited = 1 ORDER BY timestamp DESC LIMIT ? OFFSET ?", limit, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	var echos []Echo
-
-	for rows.Next() {
-		var e Echo
-
-		err := rows.Scan(&e.ID, &e.Hash, &e.Name, &e.Extension, &e.Animated, &e.Size, &e.UploadSize, &e.Timestamp, &e.Favorited)
-		if err != nil {
-			return nil, err
-		}
-
-		echos = append(echos, e)
-	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
-	return echos, nil
-}
-
 func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 	var total int64
 
@@ -336,7 +317,7 @@ func (d *EchoDatabase) Verify() (uint64, uint64, error) {
 	invalid := make([]any, 0)
 
 	for {
-		echos, err = d.FindAll(context.Background(), offset, VerifyChunkSize)
+		echos, err = d.FindAll(context.Background(), offset, VerifyChunkSize, false)
 		if err != nil {
 			break
 		}

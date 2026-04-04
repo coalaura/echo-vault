@@ -130,16 +130,9 @@ func listEchosHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	favorites := r.URL.Query().Get("favorites") == "true"
+	favoritesOnly := r.URL.Query().Get("favorites") == "1"
 
-	var echos []Echo
-	var err error
-
-	if favorites {
-		echos, err = database.FindFavorites(r.Context(), (page-1)*PageSize, PageSize)
-	} else {
-		echos, err = database.FindAll(r.Context(), (page-1)*PageSize, PageSize)
-	}
+	echos, err := database.FindAll(r.Context(), (page-1)*PageSize, PageSize, favoritesOnly)
 
 	if err != nil {
 		abort(w, http.StatusInternalServerError, "database error")
