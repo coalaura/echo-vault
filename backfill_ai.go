@@ -55,7 +55,7 @@ func (d *EchoDatabase) Backfill(total uint64) {
 	})
 
 	for {
-		echos, err := d.FindAll(context.Background(), offset, BackfillChunkSize)
+		echos, err := d.FindAll(context.Background(), offset, BackfillChunkSize, false)
 		if err != nil {
 			log.Warnf("Backfill read failed: %v\n", err)
 
